@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+*.vsix
+*.tsbuildinfo
+apps/companion/release/
+
+# The art reference is not ours to publish.
+refpic.png
+# Stale compiler output; the package is built into dist/.
+packages/shared/src/*.js
+packages/shared/src/*.js.map
+packages/shared/src/index.d.ts

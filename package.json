@@ -1,0 +1,15 @@
+{
+  "name": "bob-pet",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Independent, privacy-first pixel desktop companion for IBM Bob users.",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "build": "npm run build --workspace=@bob-pet/shared && npm run build --workspace=@bob-pet/companion && npm run build --workspace=bob-pet",
+    "test": "npm run test --workspace=@bob-pet/shared && npm run test --workspace=@bob-pet/companion && npm run test --workspace=bob-pet",
+    "package": "npm run package --workspace=@bob-pet/companion && npm run package --workspace=bob-pet",
+    "checksums": "node scripts/checksums.mjs"
+  },
+  "engines": { "node": ">=20.11" },
+  "packageManager": "npm@11.19.0"
+}

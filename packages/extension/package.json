@@ -1,0 +1,22 @@
+{
+  "name": "bob-pet",
+  "displayName": "Bob Pet",
+  "version": "0.1.0",
+  "publisher": "bob-pet-community",
+  "description": "Optional local controls for the independent Bob Pet companion. Not affiliated with IBM.",
+  "license": "MIT",
+  "private": true,
+  "engines": { "vscode": "^1.102.0" },
+  "categories": ["Other"],
+  "main": "./dist/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "commands": [
+      { "command": "bobPet.start", "title": "Bob Pet: Start Pet" }, { "command": "bobPet.stop", "title": "Bob Pet: Stop Pet" }, { "command": "bobPet.focus", "title": "Bob Pet: Focus Bob" }, { "command": "bobPet.setState", "title": "Bob Pet: Set Pet State" }, { "command": "bobPet.openSettings", "title": "Bob Pet: Open Settings" }, { "command": "bobPet.connect", "title": "Bob Pet: Connect to IBM Bob" }, { "command": "bobPet.disconnect", "title": "Bob Pet: Disconnect from IBM Bob" }
+    ],
+    "configuration": { "title": "Bob Pet", "properties": { "bobPet.companionPath": { "type": "string", "default": "", "description": "Path to the independently installed Bob Pet companion executable." }, "bobPet.ipcPort": { "type": "number", "default": 48173, "minimum": 1024, "maximum": 65535, "description": "Loopback port used only for this VS Code-compatible extension session." } } }
+  },
+  "scripts": { "build": "tsc -p tsconfig.json", "test": "npm run build && node --test dist/**/*.test.js", "package": "npm run build && vsce package --out ../../dist/bob-pet-0.1.0.vsix --allow-missing-repository" },
+  "dependencies": { "@bob-pet/shared": "0.1.0" },
+  "devDependencies": { "@types/node": "24.5.2", "@types/vscode": "1.102.0", "@vscode/vsce": "3.6.0", "typescript": "5.9.2" }
+}

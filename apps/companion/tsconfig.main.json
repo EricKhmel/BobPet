@@ -1,0 +1,1 @@
+{ "extends": "../../tsconfig.base.json", "compilerOptions": { "rootDir": "src/main", "outDir": "dist/main", "types": ["node", "electron"] }, "include": ["src/main"] }

@@ -1,0 +1,189 @@
+:root {
+  color-scheme: light dark;
+}
+* {
+  box-sizing: border-box;
+}
+html, body, #root, main {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+}
+main {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.pet {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  display: block;
+  pointer-events: none;
+}
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  pointer-events: none;
+}
+.click-target {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+  z-index: 2;
+  opacity: 0;
+  appearance: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+}
+.click-target:active {
+  cursor: grabbing;
+}
+.scale {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  border: 1px solid #525252;
+  background: rgba(22, 22, 22, 0.9);
+  color: #ffffff;
+  font: bold 9px system-ui, sans-serif;
+  padding: 1px 4px;
+  border-radius: 3px;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.15s ease-in-out;
+  z-index: 10;
+}
+.stage:hover .scale,
+.scale:focus-visible {
+  opacity: 1;
+}
+/* The cursor sits over the pet for the whole drag; the chip would just be in the way. */
+.stage:has(.click-target:active) .scale {
+  opacity: 0;
+}
+output {
+  position: absolute;
+  left: 2px;
+  bottom: 2px;
+  max-width: calc(100% - 4px);
+  border-radius: 4px;
+  padding: 2px 4px;
+  background: #161616;
+  color: #fff;
+  font: 10px system-ui, sans-serif;
+  pointer-events: none;
+  z-index: 11;
+}
+@media (prefers-contrast: more) {
+  canvas {
+    outline: 2px solid CanvasText;
+  }
+  .scale {
+    opacity: 1;
+  }
+}
+
+/* --- Speech bubble -------------------------------------------------------
+   Sits below the pet with a tail under his mouth so the line reads as his.
+   It is deliberately outside the drag surface: the pet is dragged by his body,
+   never by the words, so text can be selected and the buttons stay clickable. */
+/* The pet's own box, centred along the top of a window that also keeps room for the bubble. */
+.stage {
+  position: absolute;
+  top: 0;
+}
+.pet {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.bubble {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  background: #ffffff;
+  color: #161616;
+  border: 2px solid #161616;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: 12px/1.25 system-ui, sans-serif;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  z-index: 5;
+  cursor: default;
+  user-select: text;
+  transform-origin: 50% 0;
+  animation: bubble-in 180ms ease-out both;
+}
+.bubble.leaving {
+  animation: bubble-out 180ms ease-in both;
+  pointer-events: none;
+}
+.bubble p {
+  margin: 0;
+  overflow-wrap: anywhere;
+  /* The window has room for four lines (layout.ts); longer ones end in an ellipsis. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+  animation: line-in 160ms ease-out both;
+}
+.bubble .elapsed {
+  margin-left: 6px;
+  color: #6f6f6f;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bubble .elapsed::before {
+  content: '· ';
+}
+@keyframes bubble-in {
+  from { opacity: 0; transform: translateY(-3px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes bubble-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(-3px) scale(0.96); }
+}
+@keyframes line-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bubble, .bubble.leaving, .bubble p {
+    animation: none;
+  }
+}
+.bubble .tail {
+  position: absolute;
+  top: -8px;
+  width: 12px;
+  height: 8px;
+  background: #ffffff;
+  border-left: 2px solid #161616;
+  border-top: 2px solid #161616;
+  transform: skewX(-20deg);
+}
+@media (prefers-contrast: more) {
+  .bubble {
+    border-width: 3px;
+  }
+}

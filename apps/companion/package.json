@@ -1,0 +1,30 @@
+{
+  "name": "@bob-pet/companion",
+  "version": "0.1.0",
+  "description": "Bob Pet desktop companion",
+  "author": "Bob Pet Community",
+  "private": true,
+  "main": "dist/main/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"vite --host 127.0.0.1 --port 5173\" \"wait-on tcp:127.0.0.1:5173 && cross-env BOB_PET_DEV_SERVER=http://127.0.0.1:5173 electron .\"",
+    "build": "vite build && tsc -p tsconfig.main.json && tsc -p tsconfig.preload.json",
+    "test": "npm run build && node --test dist/main/**/*.test.js",
+    "package": "npm run build && electron-builder --win nsis --x64 --publish never",
+    "lint": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.preload.json"
+  },
+  "build": {
+    "appId": "com.bobpet.companion",
+    "productName": "Bob Pet",
+    "artifactName": "bob-pet-companion-${version}-win-${arch}.${ext}",
+    "directories": { "output": "../../dist" },
+    "files": ["dist/**", "package.json"],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "signAndEditExecutable": false
+    },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
+    "asar": true
+  },
+  "dependencies": { "@bob-pet/shared": "0.1.0", "react": "19.1.1", "react-dom": "19.1.1" },
+  "devDependencies": { "@types/node": "24.5.2", "@types/react": "19.1.12", "@types/react-dom": "19.1.9", "@vitejs/plugin-react": "5.0.2", "concurrently": "9.2.1", "cross-env": "10.0.0", "electron": "38.1.2", "electron-builder": "26.0.12", "typescript": "5.9.2", "vite": "7.1.7", "wait-on": "8.0.4" }
+}
