@@ -3,7 +3,7 @@
 ## From the extension (recommended)
 
 1. In IBM Bob, open **Extensions** and install **Bob Pet** (or **Install from VSIX…** with
-   `bob-pet-0.1.0.vsix`).
+   `bob-pet-0.1.1.vsix`).
 2. Answer **Set up Bob Pet** when it asks. That one answer covers both things it needs
    your permission for: a one-time download of the pet itself (about 110MB), and the hooks
    in `~/.bob/settings/settings.json` that let it see what Bob is doing.
@@ -20,7 +20,7 @@ After that, the pet starts whenever Bob opens. Turn that off with `bobPet.autoSt
 
 ## Companion on its own (no extension)
 
-1. Obtain `bob-pet-companion-0.1.0-win-x64.exe` and verify it with `SHA256SUMS.txt`.
+1. Obtain `bob-pet-companion-0.1.1-win-x64.exe` and verify it with `SHA256SUMS.txt`.
 2. Run the installer. It is independent of IBM Bob and does not modify its files.
 3. Launch **Bob Pet** from the Start menu. Without the extension the pet still idles,
    animates, drags, resizes and can make a best-effort request to focus IBM Bob; it cannot
@@ -32,7 +32,7 @@ After that, the pet starts whenever Bob opens. Turn that off with `bobPet.autoSt
 ## Optional VSIX, installed by hand
 
 1. In IBM Bob, open **Extensions**.
-2. Select **Install from VSIX…** and choose `bob-pet-0.1.0.vsix`.
+2. Select **Install from VSIX…** and choose `bob-pet-0.1.1.vsix`.
 3. Reload the IDE if prompted.
 4. Run **Bob Pet: Start Pet**, then use the status bar or command palette for states,
    focus, settings, and stop. **Bob Pet: Connect to IBM Bob** installs the hooks, and

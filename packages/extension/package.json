@@ -1,7 +1,7 @@
 {
   "name": "bob-pet",
   "displayName": "Bob Pet",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "bob-pet-community",
   "description": "A pixel-art desktop pet that reacts to what IBM Bob is doing. Windows only for now; macOS and Linux are not supported yet. Not affiliated with IBM.",
   "license": "MIT",
@@ -21,7 +21,7 @@
     ],
     "configuration": { "title": "Bob Pet", "properties": { "bobPet.companionPath": { "type": "string", "default": "", "description": "Path to the independently installed Bob Pet companion executable." }, "bobPet.ipcPort": { "type": "number", "default": 48173, "minimum": 1024, "maximum": 65535, "description": "Loopback port used only for this VS Code-compatible extension session." }, "bobPet.autoStart": { "type": "boolean", "default": true, "description": "Start the pet automatically when IBM Bob opens." } } }
   },
-  "scripts": { "vscode:uninstall": "node ./dist/uninstall.js", "build": "tsc -p tsconfig.json", "test": "npm run build && node --test dist/**/*.test.js", "package": "npm run build && vsce package --target win32-x64 --out ../../dist/bob-pet-0.1.0.vsix" },
-  "dependencies": { "@bob-pet/shared": "0.1.0" },
+  "scripts": { "vscode:uninstall": "node ./dist/uninstall.js", "build": "tsc -p tsconfig.json", "test": "npm run build && node --test dist/**/*.test.js", "package": "npm run build && vsce package --target win32-x64 --out ../../dist/bob-pet-0.1.1.vsix" },
+  "dependencies": { "@bob-pet/shared": "0.1.1" },
   "devDependencies": { "@types/node": "24.5.2", "@types/vscode": "1.102.0", "@vscode/vsce": "3.6.0", "typescript": "5.9.2" }
 }

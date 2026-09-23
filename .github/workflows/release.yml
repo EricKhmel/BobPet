@@ -47,16 +47,16 @@ jobs:
         env:
           OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}
         if: ${{ env.OVSX_PAT != '' }}
-        run: npx --yes ovsx publish dist/bob-pet-0.1.0.vsix --pat "$env:OVSX_PAT"
+        run: npx --yes ovsx publish dist/bob-pet-0.1.1.vsix --pat "$env:OVSX_PAT"
 
       - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             ${{ env.ZIP }}
-            dist/bob-pet-0.1.0.vsix
+            dist/bob-pet-0.1.1.vsix
             dist/SHA256SUMS.txt
           body: |
-            Install the extension from `bob-pet-0.1.0.vsix`. It downloads the companion
+            Install the extension from `bob-pet-0.1.1.vsix`. It downloads the companion
             zip published here on first run and checks it against a fingerprint built into
             the extension, so there is nothing else to install.

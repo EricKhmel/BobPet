@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased — 2026-09-17
+## 0.1.1 — 2026-09-23
 
-Artifact names stay at `0.1.0`; reinstall over the existing companion to pick this up.
+Installing the extension now sets everything up, so there is nothing else to download by hand.
 
 ### Added
 
