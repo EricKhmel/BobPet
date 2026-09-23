@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- A celebration you pick yourself, from the right-click menu or a command, now stays until
+  you change it, like every other state. Only a celebration Bob raises by finishing its
+  work still ends on its own after 6.4 seconds. Hook reports now say they came from Bob,
+  which is what tells the two apart.
+
 ## 0.1.1 — 2026-09-23
 
 Installing the extension now sets everything up, so there is nothing else to download by hand.

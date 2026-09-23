@@ -56,11 +56,16 @@ Allowed payloads are only:
 type PetState = 'IDLE' | 'WORKING' | 'THINKING' | 'CELEBRATING' | 'SLEEPING' | 'FOCUS';
 type Message =
   | { version: 1; type: 'hello'; secret: string }
-  | { version: 1; type: 'set-state'; state: PetState }
+  | { version: 1; type: 'set-state'; state: PetState; label?: string; source?: 'bob' }
   | { version: 1; type: 'focus-request' }
   | { version: 1; type: 'request-focus-ide' }
   | { version: 1; type: 'ping' };
 ```
+
+`label` is the line the pet says for this step. `source: 'bob'` marks a report that came
+from one of Bob's own hooks rather than from a person choosing a state: only a celebration
+Bob raised ends on its own timer, while a state someone picked from the menu or a command
+stays until they pick another, like every other state.
 
 Validate all messages at both ends. Reject unknown versions, fields, states, origins, or untrusted clients. Never bind a service to `0.0.0.0` or a LAN address.
 

@@ -68,7 +68,7 @@ let sleepTimer: NodeJS.Timeout | undefined;
  * cheer briefly and settle, and a quiet agent should eventually doze, so those two
  * transitions are owned here rather than depending on a further event arriving.
  */
-async function setState(next: PetState, label?: string): Promise<void> {
+async function setState(next: PetState, label?: string, source?: 'bob'): Promise<void> {
   state = next;
   const now = Date.now();
   const busy = next === 'THINKING' || next === 'WORKING' || next === 'FOCUS';
@@ -99,7 +99,9 @@ async function setState(next: PetState, label?: string): Promise<void> {
   sleepTimer = undefined;
   if (next === 'SLEEPING') { await applyBubble(undefined); return; }
 
-  if (next === 'CELEBRATING') {
+  // Only a celebration Bob raised ends by itself. One picked from the menu or sent by the
+  // extension is a state the user chose, and it stays until they choose another.
+  if (next === 'CELEBRATING' && source === 'bob') {
     revertTimer = setTimeout(() => {
       void applyBubble(undefined);
       void setState('IDLE');
@@ -376,7 +378,7 @@ async function startup(): Promise<void> {
   const secret = process.env.BOB_PET_IPC_SECRET ?? argument('--ipc-secret') ?? randomBytes(32).toString('hex');
   const requestedPort = Number(process.env.BOB_PET_IPC_PORT ?? argument('--ipc-port') ?? '48173');
   const portToUse = Number.isInteger(requestedPort) && requestedPort > 0 && requestedPort <= 65535 ? requestedPort : 48173;
-  server = new LocalPetServer(secret, (next, label) => void setState(next, label), () => void focusBob());
+  server = new LocalPetServer(secret, (next, label, source) => void setState(next, label, source), () => void focusBob());
   const actualPort = await server.start(portToUse);
   console.log(`Bob Pet IPC server listening on 127.0.0.1:${actualPort}`);
   if (actualPort !== portToUse) console.log(`Port ${portToUse} was taken; hooks and the extension will find this one in session.json`);

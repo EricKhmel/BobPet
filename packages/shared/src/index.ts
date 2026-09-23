@@ -4,7 +4,7 @@ export const PET_STATES = ['IDLE', 'WORKING', 'THINKING', 'CELEBRATING', 'SLEEPI
 export type PetState = (typeof PET_STATES)[number];
 export type Message =
   | { version: 1; type: 'hello'; secret: string }
-  | { version: 1; type: 'set-state'; state: PetState; label?: string }
+  | { version: 1; type: 'set-state'; state: PetState; label?: string; source?: 'bob' }
   | { version: 1; type: 'focus-request' }
   | { version: 1; type: 'request-focus-ide' }
   | { version: 1; type: 'ping' };
@@ -29,9 +29,16 @@ export function parseMessage(input: unknown): Message | undefined {
     return { version: 1, type: 'hello', secret: value.secret };
   }
   const isState = typeof value.state === 'string' && PET_STATES.includes(value.state as PetState);
-  if (value.type === 'set-state' && isState && (exactKeys(value, ['version', 'type', 'state']) || exactKeys(value, ['version', 'type', 'state', 'label']))) {
+  // `source` says the report came from one of Bob's own hooks rather than from a person
+  // choosing a state. Only Bob finishing its work ends by itself; a state you picked stays.
+  const allowed = ['version', 'type', 'state', 'label', 'source'];
+  const knownKeys = Object.keys(value).every((key) => allowed.includes(key));
+  const source = value.source === 'bob' ? ('bob' as const) : undefined;
+  const sourceOk = value.source === undefined || source !== undefined;
+  if (value.type === 'set-state' && isState && knownKeys && sourceOk) {
     const label = cleanLabel(value.label);
-    return label ? { version: 1, type: 'set-state', state: value.state as PetState, label } : { version: 1, type: 'set-state', state: value.state as PetState };
+    const message: Message = { version: 1, type: 'set-state', state: value.state as PetState };
+    return { ...message, ...(label ? { label } : {}), ...(source ? { source } : {}) };
   }
   if ((value.type === 'focus-request' || value.type === 'request-focus-ide' || value.type === 'ping') && exactKeys(value, ['version', 'type'])) {
     return { version: 1, type: value.type };

@@ -12,7 +12,7 @@ export class LocalPetServer {
 
   constructor(
     private readonly secret: string,
-    private readonly onState: (state: PetState, label?: string) => void,
+    private readonly onState: (state: PetState, label?: string, source?: 'bob') => void,
     private readonly onFocus: () => void
   ) {}
 
@@ -111,7 +111,7 @@ export class LocalPetServer {
   }
 
   private dispatch(message: Exclude<Message, { type: 'hello' }>, socket: Socket): void {
-    if (message.type === 'set-state') this.onState(message.state, message.label);
+    if (message.type === 'set-state') this.onState(message.state, message.label, message.source);
     if (message.type === 'focus-request') this.onFocus();
     if (message.type === 'ping') socket.write('{"ok":true}\n');
   }

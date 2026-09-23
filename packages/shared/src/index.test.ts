@@ -210,3 +210,18 @@ test('the drop-in falls from where it was dropped, bounces smaller, and ends sti
   assert.deepEqual(dropIn(total, HIGH), { rise: 0, squash: 0 }, 'ends exactly where he belongs');
   assert.deepEqual(dropIn(total + 5_000, HIGH), { rise: 0, squash: 0 }, 'and stays there');
 });
+
+test("a report can say it came from Bob's own hooks, and nothing else gets in", () => {
+  const fromBob = parseMessage({ version: 1, type: 'set-state', state: 'CELEBRATING', label: 'All done', source: 'bob' });
+  assert.deepEqual(fromBob, { version: 1, type: 'set-state', state: 'CELEBRATING', label: 'All done', source: 'bob' });
+
+  // Picked by a person: no source, so the pet keeps the state until they change it.
+  const byHand = parseMessage({ version: 1, type: 'set-state', state: 'CELEBRATING' });
+  assert.deepEqual(byHand, { version: 1, type: 'set-state', state: 'CELEBRATING' });
+  assert.equal((byHand as { source?: string }).source, undefined);
+
+  // Only that one value means anything, and unknown fields are still refused.
+  assert.equal(parseMessage({ version: 1, type: 'set-state', state: 'IDLE', source: 'extension' }), undefined);
+  assert.equal(parseMessage({ version: 1, type: 'set-state', state: 'IDLE', source: true }), undefined);
+  assert.equal(parseMessage({ version: 1, type: 'set-state', state: 'IDLE', sneaky: 1 }), undefined);
+});

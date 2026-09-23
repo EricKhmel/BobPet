@@ -100,7 +100,9 @@ async function main(): Promise<void> {
   }
 
   const label = describeHook(payload);
-  await send(label ? { version: 1, type: 'set-state', state, label } : { version: 1, type: 'set-state', state });
+  // Marked as Bob's own report: a celebration it raises ends by itself, one a person
+  // picks from the menu stays until they change it.
+  await send({ version: 1, type: 'set-state', state, ...(label ? { label } : {}), source: 'bob' });
   debug('done', state);
 }
 
