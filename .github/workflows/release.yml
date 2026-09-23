@@ -42,6 +42,13 @@ jobs:
       - name: Checksums
         run: npm run checksums
 
+      # Skipped until OPEN_VSX_TOKEN is added to the repository's secrets.
+      - name: Publish to Open VSX
+        env:
+          OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}
+        if: ${{ env.OVSX_PAT != '' }}
+        run: npx --yes ovsx publish dist/bob-pet-0.1.0.vsix --pat "$env:OVSX_PAT"
+
       - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
