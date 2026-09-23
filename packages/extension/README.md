@@ -2,6 +2,8 @@
 
 A pixel-art desktop pet that acts out what IBM Bob is doing.
 
+![Bob Pet reacting as Bob thinks, runs a command, reads a file and finishes](https://raw.githubusercontent.com/EricKhmel/BobPet/main/docs/media/bobpet.gif)
+
 It hammers while Bob runs commands, reads at a laptop while Bob searches your code, thinks
 between steps, and throws confetti when Bob finishes. It tells you what Bob is on — "Running
 npm test", "Editing index.ts" — and, when Bob is waiting for you to approve something, it
