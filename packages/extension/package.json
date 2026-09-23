@@ -2,7 +2,7 @@
   "name": "bob-pet",
   "displayName": "Bob Pet",
   "version": "0.1.1",
-  "publisher": "bob-pet-community",
+  "publisher": "bob-pet-erickhmel",
   "description": "A pixel-art desktop pet that reacts to what IBM Bob is doing. Windows only for now; macOS and Linux are not supported yet. Not affiliated with IBM.",
   "license": "MIT",
   "repository": { "type": "git", "url": "https://github.com/EricKhmel/BobPet.git" },
