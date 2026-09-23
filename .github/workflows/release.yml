@@ -1,0 +1,55 @@
+# Publishes a release: the companion as a zip, and the extension that downloads it.
+#
+# The extension is stamped with the zip's fingerprint before it is packaged, so it only
+# ever accepts the exact companion published alongside it. Tag a commit to release, e.g.
+# `git tag v0.1.1 && git push origin v0.1.1`.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Build the companion as a zip
+        run: npm run package:zip --workspace=@bob-pet/companion
+
+      - name: Point the extension at this release
+        shell: bash
+        run: |
+          zip=$(ls dist/bob-pet-companion-*-win-x64.zip)
+          echo "ZIP=$zip" >> "$GITHUB_ENV"
+          node scripts/stamp-release.mjs "$zip" \
+            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/$(basename "$zip")"
+
+      - name: Package the extension
+        run: npm run package --workspace=bob-pet
+
+      - name: Checksums
+        run: npm run checksums
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ env.ZIP }}
+            dist/bob-pet-0.1.0.vsix
+            dist/SHA256SUMS.txt
+          body: |
+            Install the extension from `bob-pet-0.1.0.vsix`. It downloads the companion
+            zip published here on first run and checks it against a fingerprint built into
+            the extension, so there is nothing else to install.

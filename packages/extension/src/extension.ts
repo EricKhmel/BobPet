@@ -7,6 +7,9 @@ import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { exec, spawn, type ChildProcess } from 'node:child_process';
 import { type PetState } from '@bob-pet/shared';
+import { HOOK_EVENTS, HOOK_TARGETS, HOOK_TIMEOUT_S, applyHooks, hookCommand, installedPetHooks, type HookEntry } from './hooks.js';
+import { canDownload, companionExe, ensureDownloadedCompanion } from './install.js';
+import { COMPANION_RELEASE } from './release.js';
 
 let companion: ChildProcess | undefined;
 let secret: string | undefined;
@@ -83,6 +86,25 @@ function setupPersistentListener(targetPort: number, targetSecret: string): void
   socket.on('close', () => {
     log('Persistent socket closed');
   });
+}
+
+/**
+ * The port the running pet published for this launch.
+ *
+ * The pet takes any free port when the configured one is in use, so the number we asked
+ * for is only a request. It writes what it got to `session.json` in its own user-data
+ * folder, which is also where the hooks read it from. A stale file is harmless: the
+ * handshake still has to succeed with the secret this window generated.
+ */
+async function publishedPort(): Promise<number | undefined> {
+  const appData = process.env.APPDATA;
+  if (!appData) return undefined;
+  try {
+    const raw = JSON.parse(await readFile(join(appData, 'Bob Pet', 'session.json'), 'utf8')) as { port?: unknown };
+    return typeof raw.port === 'number' && raw.port > 0 && raw.port <= 65535 ? raw.port : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 async function send(message: Record<string, unknown>): Promise<{ ok: boolean; reason?: string }> {
@@ -204,6 +226,14 @@ async function start(): Promise<void> {
   let lastReason = '';
   for (let retry = 1; retry <= 25; retry += 1) {
     await new Promise((resolve) => setTimeout(resolve, 300));
+    // Give the requested port a fair chance before believing a file about it.
+    if (retry === 6) {
+      const published = await publishedPort();
+      if (published !== undefined && published !== port) {
+        log(`Port ${String(port)} did not answer; session.json says the pet took ${published}`);
+        port = published;
+      }
+    }
     const result = await send({ version: 1, type: 'ping' });
     if (result.ok) {
       log(`Bob Pet handshake successful on attempt ${retry}!`);
@@ -251,31 +281,6 @@ async function chooseState(): Promise<void> {
 }
 
 
-// ---------------------------------------------------------------------------
-// IBM Bob hook integration
-//
-// Bob runs a command for each of its documented hook events (SessionStart,
-// UserPromptSubmit, PreToolUse, PostToolUse, Stop), configured in its own
-// settings.json. That is the sanctioned way to observe agent activity: no Bob file is
-// modified, no undocumented API is called, and the user opts in explicitly by running
-// the connect command. The pet's state comes from those events and nothing else.
-// ---------------------------------------------------------------------------
-
-const HOOK_EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Stop'] as const;
-
-/**
- * The pet follows IBM Bob's own agent. Other agents that may run inside the IDE are
- * deliberately not wired up: the pet should reflect what Bob is doing, not whatever
- * else happens to be running in a panel.
- */
-type HookTarget = { label: string; settings: string };
-const HOOK_TARGETS: HookTarget[] = [
-  { label: 'IBM Bob agent (bob-code)', settings: join(homedir(), '.bob', 'settings', 'settings.json') }
-];
-
-type HookEntry = { type: 'command'; command: string; timeout?: number; disabled?: boolean };
-type HookGroup = { matcher?: string; hooks: HookEntry[] };
-
 /**
  * Locates the companion and the hook script that ships beside it.
  *
@@ -289,6 +294,8 @@ function resolveCompanion(): { exe: string; hookScript: string } | undefined {
   const localApps = process.env.LOCALAPPDATA ?? '';
   const candidates = [
     configured,
+    // What this extension downloaded for itself, which is how most people will have it.
+    storageRoot && COMPANION_RELEASE.version ? companionExe(storageRoot) : '',
     localApps ? join(localApps, 'Programs', 'bob-pet-companion', 'Bob Pet.exe') : '',
     wsRoot ? join(wsRoot, 'BobPet', 'dist', 'win-unpacked', 'Bob Pet.exe') : '',
     wsRoot ? join(wsRoot, 'dist', 'win-unpacked', 'Bob Pet.exe') : '',
@@ -311,78 +318,7 @@ function resolveCompanion(): { exe: string; hookScript: string } | undefined {
   return undefined;
 }
 
-/**
- * Builds the single command string Bob runs for every hook event.
- *
- * Bob invokes hooks with `exec`, which on Windows is `cmd.exe /d /s /c "<command>"`.
- * An earlier version pointed that at a generated `.cmd` shim; cmd refused to run it from
- * the extension host - `'"...\bob-pet-hook.cmd"' is not recognized` - even though the
- * file existed and PATHEXT contained `.CMD`. Chaining builtins with `&` needs no file
- * resolution at all, and builtins are demonstrably fine in that environment.
- *
- * `ELECTRON_RUN_AS_NODE` runs the companion's bundled Node without starting Chromium,
- * keeping each hook to tens of milliseconds.
- *
- * `ELECTRON_NO_ASAR` must be *cleared*: the extension host exports it, `exec` passes it
- * down, and with it set `app.asar` stops behaving as a directory, so requiring the hook
- * out of the archive fails at module load - before any error handling inside the hook
- * can run, making the failure invisible.
- *
- * stdout goes to nul so Bob can never receive output from us (it would be injected into
- * the model's context); stderr is captured to a single overwritten file so a failure is
- * diagnosable without the log growing without bound.
- */
-const HOOK_MARKER = 'BOB_PET_HOOK';
-const HOOK_TIMEOUT_S = 5;
-function hookCommand(target: { exe: string; hookScript: string }): string {
-  const errorLog = join(process.env.APPDATA ?? homedir(), 'Bob Pet', 'hook-last-error.log');
-  return [
-    `set "${HOOK_MARKER}=1"`,
-    'set "ELECTRON_RUN_AS_NODE=1"',
-    'set "ELECTRON_NO_ASAR="',
-    `"${target.exe}" "${target.hookScript}" 1>nul 2>"${errorLog}"`
-  ].join(' & ');
-}
-
-async function readAgentSettings(path: string): Promise<Record<string, unknown>> {
-  try {
-    const parsed: unknown = JSON.parse(await readFile(path, 'utf8'));
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
-  } catch {
-    return {};
-  }
-}
-
-const isOurs = (entry: HookEntry): boolean => entry.command.includes(HOOK_MARKER);
-
-/** Returns the hooks block with our entries removed, leaving anyone else's intact. */
-function withoutPetHooks(hooks: Record<string, HookGroup[]>): Record<string, HookGroup[]> {
-  const next: Record<string, HookGroup[]> = {};
-  for (const [event, groups] of Object.entries(hooks)) {
-    const kept = groups
-      .map((group) => ({ ...group, hooks: group.hooks.filter((entry) => !isOurs(entry)) }))
-      .filter((group) => group.hooks.length > 0);
-    if (kept.length > 0) next[event] = kept;
-  }
-  return next;
-}
-
-/** Rewrites one agent's settings file, preserving every key that is not ours. */
-async function applyHooks(target: HookTarget, entry: HookEntry | undefined): Promise<void> {
-  const settings = await readAgentSettings(target.settings);
-  const hooks = withoutPetHooks((settings.hooks ?? {}) as Record<string, HookGroup[]>);
-  if (entry) {
-    // Every event is a quick, fire-and-forget report; none of them waits on a person.
-    for (const event of HOOK_EVENTS) hooks[event] = [...(hooks[event] ?? []), { hooks: [entry] }];
-  }
-  const next: Record<string, unknown> = { ...settings };
-  if (Object.keys(hooks).length > 0) next.hooks = hooks;
-  else delete next.hooks;
-  await mkdir(dirname(target.settings), { recursive: true });
-  await writeFile(target.settings, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
-}
-
-async function connect(): Promise<void> {
+async function connect(options: { ask?: boolean } = {}): Promise<void> {
   const companion = resolveCompanion();
   if (!companion) {
     void vscode.window.showErrorMessage(
@@ -396,7 +332,7 @@ async function connect(): Promise<void> {
   // long detail grows the modal until its buttons are pushed off a small screen. The
   // exact command goes to the output channel instead, where it can be read in full.
   log(`Connect: hook command is ${command}`);
-  const choice = await vscode.window.showInformationMessage(
+  const choice = options.ask === false ? 'Add hooks' : await vscode.window.showInformationMessage(
     'Let Bob Pet follow IBM Bob? The pet will react to your messages and to Bob using tools.',
     {
       modal: true,
@@ -458,9 +394,104 @@ async function disconnect(): Promise<void> {
   void vscode.window.showInformationMessage('Bob Pet hooks removed.');
 }
 
+/**
+ * Everything the pet needs, set up in one step the first time the extension runs.
+ *
+ * Installing an extension should be all anyone has to do, but two of the things the pet
+ * needs are the user's to allow: a one-time download of the companion application, and
+ * hooks in Bob's settings so it can see what Bob is doing. Both are named in a single
+ * prompt, and "Not now" is remembered so nobody is asked again at every startup. The
+ * commands stay available for anyone who changes their mind.
+ */
+const DECLINED = 'bobPet.declinedSetup';
+
+async function setUp(context: vscode.ExtensionContext, asked: boolean): Promise<void> {
+  if (resolveCompanion()) return;
+  if (!canDownload()) {
+    log('No companion found and this build has no download configured; use bobPet.companionPath.');
+    return;
+  }
+  if (!asked && context.globalState.get<boolean>(DECLINED)) return;
+
+  const size = COMPANION_RELEASE.bytes ? `${Math.round(COMPANION_RELEASE.bytes / 1e6)}MB` : 'about 100MB';
+  const choice = await vscode.window.showInformationMessage(
+    'Set up Bob Pet?',
+    {
+      modal: true,
+      detail:
+        `This downloads the pet (${size}, once) and adds ${HOOK_EVENTS.length} hooks to ${HOOK_TARGETS[0].settings} ` +
+        'so it can react to what Bob is doing.\n\n' +
+        'The download is checked against a fingerprint built into this extension before it runs. The hooks print ' +
+        'nothing and always exit 0, so they cannot change or block anything Bob does. Uninstalling removes them.'
+    },
+    'Set up Bob Pet'
+  );
+  if (choice !== 'Set up Bob Pet') {
+    await context.globalState.update(DECLINED, true);
+    log('Set-up declined; the pet will stay out of the way until a Bob Pet command is run.');
+    return;
+  }
+  await context.globalState.update(DECLINED, false);
+
+  try {
+    await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: 'Bob Pet', cancellable: false },
+      async (progress) => {
+        let last = 0;
+        await ensureDownloadedCompanion(
+          storageRoot,
+          (message, fraction) => {
+            const percent = fraction === undefined ? 0 : Math.round(fraction * 100);
+            progress.report({ message, increment: Math.max(0, percent - last) });
+            if (fraction !== undefined) last = percent;
+          },
+          log
+        );
+      }
+    );
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    log(`Companion download failed: ${reason}`);
+    const retry = await vscode.window.showErrorMessage(`Bob Pet could not be downloaded: ${reason}`, 'Try again');
+    if (retry === 'Try again') await setUp(context, true);
+    return;
+  }
+
+  await connect({ ask: false });
+  await start();
+}
+
+/**
+ * Keeps installed hooks pointing at the companion that is actually there.
+ *
+ * Every extension update installs to a new folder, so a hook written by an earlier
+ * version names a path that no longer exists. Only entries the pet owns are rewritten,
+ * and only when they have gone stale; a user who never connected stays unhooked.
+ */
+async function refreshHooks(): Promise<void> {
+  const companion = resolveCompanion();
+  if (!companion) return;
+  const wanted = hookCommand(companion);
+  for (const target of HOOK_TARGETS) {
+    const existing = await installedPetHooks(target);
+    if (existing.length === 0 || existing.every((command) => command === wanted)) continue;
+    await applyHooks(target, { type: 'command', command: wanted, timeout: HOOK_TIMEOUT_S });
+    log(`Updated the pet's hooks in ${target.settings} to the current companion`);
+  }
+}
+
+let storageRoot = '';
+
 export function activate(context: vscode.ExtensionContext): void {
   status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   showStatus('Start Bob Pet', 'bobPet.start');
+  storageRoot = context.globalStorageUri.fsPath;
+
+  void (async () => {
+    await refreshHooks();
+    await setUp(context, false);
+    if (vscode.workspace.getConfiguration('bobPet').get<boolean>('autoStart', true) && resolveCompanion()) await start();
+  })();
 
   context.subscriptions.push(
     status,
@@ -472,7 +503,7 @@ export function activate(context: vscode.ExtensionContext): void {
       if (!res.ok) void vscode.window.showWarningMessage('Bob Pet is not running.');
     }),
     vscode.commands.registerCommand('bobPet.setState', chooseState),
-    vscode.commands.registerCommand('bobPet.connect', connect),
+    vscode.commands.registerCommand('bobPet.connect', () => connect()),
     vscode.commands.registerCommand('bobPet.disconnect', disconnect),
     vscode.commands.registerCommand('bobPet.openSettings', () => vscode.commands.executeCommand('workbench.action.openSettings', 'bobPet'))
   );

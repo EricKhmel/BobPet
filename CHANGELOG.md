@@ -6,6 +6,15 @@ Artifact names stay at `0.1.0`; reinstall over the existing companion to pick th
 
 ### Added
 
+- Installing the extension is now all it takes. On first run it asks once, then downloads
+  the companion from this project's GitHub release, checks it against a fingerprint built
+  into the extension, unpacks it into its own storage folder and wires up Bob's hooks. It
+  starts the pet whenever Bob opens (`bobPet.autoStart`), keeps the hooks pointing at the
+  current build after an update, and takes them back out when it is uninstalled. Declining
+  leaves everything alone and is remembered.
+- Releases are built by GitHub Actions from a tag: tests, the companion zip, the
+  fingerprint stamped into the extension, then the VSIX and checksums published together.
+
 - The pet drops in from the top of the screen and bounces to a stop when it launches. The
   window is only as tall as the pet, so the fall is the window moving while the renderer
   squashes him on each landing, both off one timeline. Gravity is constant, so the further
@@ -22,6 +31,14 @@ Artifact names stay at `0.1.0`; reinstall over the existing companion to pick th
   "Bob Pet stopped".
 
 ### Fixed
+
+- A taken port no longer stops the pet from starting. If `bobPet.ipcPort` is in use it
+  takes any free port and publishes it in `session.json`, where the hooks already look; the
+  extension falls back to that too.
+- The companion no longer prints Node's "SQLite is an experimental feature" warning into
+  the extension's log, where it read like a fault. It also says once, in its log, when
+  Bob's record of pending approvals cannot be read, so a Bob update that moves it is
+  visible rather than silent.
 
 - Changing animation no longer blinks. The window used to resize and shift every time the
   speech bubble appeared, changed length or went away, and Windows shows a transparent

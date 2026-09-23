@@ -143,6 +143,16 @@ the pet may say a step is still going, and nothing about why.
 - TypeScript strict mode; no `any` except narrowly justified platform bindings.
 - Vite development server: `host: '127.0.0.1'`, `port: 5173`.
 - No CDN assets, web fonts, third-party telemetry, or runtime downloads. Use Web Audio oscillators only; default to muted.
+
+  **One sanctioned exception, approved by the project owner:** so that installing the
+  extension is all a user has to do, the extension may download the companion once, from
+  this project's own GitHub release, and only after the user agrees in a prompt that says
+  what it will download and what it will add to Bob's settings. The SHA-256 of the exact
+  published file is built into the extension at release time; a download that does not
+  match is deleted, never run. It is unpacked into the extension's own storage folder,
+  needs no elevation, and is removed when the extension is uninstalled. The companion
+  itself still makes no network calls at runtime, and neither does the extension once the
+  companion is in place.
 - Keep permissions minimal. Never transmit secrets, and do not log protocol secrets.
 - Add tests for state transitions, animation timing, scaling, position clamping, protocol schemas, auth failure, and extension cleanup.
 - Test transparent-window lifecycle and focus behavior behind platform adapters/mocks. Manual tests must cover all five scales, drag, restart persistence, reduced motion, mute, clicking the pet, Bob unavailable, extension unavailable, and extension shutdown.

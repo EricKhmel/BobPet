@@ -16,7 +16,24 @@ export class LocalPetServer {
     private readonly onFocus: () => void
   ) {}
 
+  /**
+   * Listens on `port`, or on any free port if that one is taken. Another program holding
+   * 48173 must not stop the pet from running; the port it actually got is published in
+   * `session.json`, which is where the hooks and the extension look it up.
+   */
   async start(port = 0): Promise<number> {
+    try {
+      return await this.listen(port);
+    } catch (error) {
+      if (port === 0 || (error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error;
+      // The failed attempt never started listening, so closing it is best effort only.
+      try { this.server?.close(); } catch { /* never listened */ }
+      this.server = undefined;
+      return this.listen(0);
+    }
+  }
+
+  private async listen(port: number): Promise<number> {
     return new Promise((resolve, reject) => {
       this.server = createServer((socket) => this.handle(socket));
       this.server.once('error', reject);

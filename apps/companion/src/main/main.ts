@@ -1,3 +1,5 @@
+// First, so it is in place before node:sqlite is loaded further down.
+import './quiet.js';
 import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, screen } from 'electron';
 import { randomBytes } from 'node:crypto';
 import { PET_SCALES, countStep, dragOutcome, dropDuration, dropIn, startTally, wrapUp, type PetScaleName, type PetState, type TaskTally } from '@bob-pet/shared';
@@ -255,6 +257,7 @@ function watchStep(label: string, started: number): void {
   let alerted = false;
   stepTimer = setInterval(() => {
     const pending = pendingApprovalsSince(database, started - APPROVAL_SLACK_MS);
+    if (pending === undefined) noteUnreadableApprovals();
     const text = stepLine(label, Date.now() - started, pending);
     if (pending && !alerted) {
       alerted = true;
@@ -264,6 +267,18 @@ function watchStep(label: string, started: number): void {
     shown = text;
     void applyBubble({ text, since: started });
   }, STEP_POLL_MS);
+}
+
+/**
+ * Says once, in the log, that Bob's own record of pending approvals could not be read.
+ * The pet stays quiet about approvals in that case, so without this line a Bob update
+ * that moved or renamed the table would look like nothing at all had changed.
+ */
+let approvalsWarned = false;
+function noteUnreadableApprovals(): void {
+  if (approvalsWarned) return;
+  approvalsWarned = true;
+  console.log(`Cannot read Bob's pending approvals in ${bobDatabasePath()}; the pet will not say when Bob needs you. This is expected if this version of Bob keeps them elsewhere.`);
 }
 
 function clearStepWatch(): void {
@@ -364,6 +379,7 @@ async function startup(): Promise<void> {
   server = new LocalPetServer(secret, (next, label) => void setState(next, label), () => void focusBob());
   const actualPort = await server.start(portToUse);
   console.log(`Bob Pet IPC server listening on 127.0.0.1:${actualPort}`);
+  if (actualPort !== portToUse) console.log(`Port ${portToUse} was taken; hooks and the extension will find this one in session.json`);
 
   // Spawn the focus helper now so the first click does not pay PowerShell startup.
   focusAdapter.warmUp();
