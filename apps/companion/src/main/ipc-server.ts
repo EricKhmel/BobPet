@@ -1,5 +1,9 @@
 import { createServer, type Server, type Socket } from 'node:net';
+import { timingSafeEqual } from 'node:crypto';
 import { parseMessage, type Message, type PetState } from '@bob-pet/shared';
+
+/** How long a connection has to identify itself before it is dropped. */
+const UNAUTHENTICATED_MS = 5_000;
 
 /** Opt-in connection trace for diagnosing clients that cannot get through. Never logs secrets. */
 const trace = (...parts: unknown[]): void => {
@@ -58,13 +62,22 @@ export class LocalPetServer {
     }
   }
 
+  /** Constant-time, so a wrong secret tells a caller nothing by how long it took. */
+  private secretMatches(offered: string): boolean {
+    const a = Buffer.from(offered, 'utf8');
+    const b = Buffer.from(this.secret, 'utf8');
+    return a.length === b.length && timingSafeEqual(a, b);
+  }
+
   private handle(socket: Socket): void {
     let authenticated = false;
     let buffer = '';
     trace('connection from', `${socket.remoteAddress}:${socket.remotePort}`);
+    // Until it says who it is, a connection has five seconds. An extension that
+    // authenticates stays connected for as long as it likes (see below).
+    socket.setTimeout(UNAUTHENTICATED_MS, () => { if (!authenticated) socket.destroy(); });
     socket.on('close', () => trace('closed', `${socket.remoteAddress}:${socket.remotePort}`, authenticated ? 'authenticated' : 'unauthenticated'));
     // Keep connection alive while extension is connected
-    socket.setTimeout(0);
     socket.on('close', () => this.activeSockets.delete(socket));
     socket.on('error', () => this.activeSockets.delete(socket));
 
@@ -92,8 +105,9 @@ export class LocalPetServer {
           return;
         }
         if (!authenticated) {
-          if (message.type === 'hello' && message.secret === this.secret) {
+          if (message.type === 'hello' && this.secretMatches(message.secret)) {
             authenticated = true;
+            socket.setTimeout(0);
             this.activeSockets.add(socket);
             socket.write('{"ok":true}\n');
             trace('authenticated');

@@ -17,6 +17,8 @@ export const sessionFilePath = (userData: string): string => join(userData, 'ses
  */
 export async function writeSessionFile(userData: string, handle: SessionHandle): Promise<void> {
   await mkdir(userData, { recursive: true });
+  // `mode` is honoured on POSIX. On Windows it only sets the read-only bit, so what keeps
+  // this file to its owner there is the per-user ACL on %APPDATA%, not this argument.
   await writeFile(sessionFilePath(userData), JSON.stringify(handle), { encoding: 'utf8', mode: 0o600 });
 }
 

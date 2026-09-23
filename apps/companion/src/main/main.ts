@@ -2,7 +2,7 @@
 import './quiet.js';
 import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, screen } from 'electron';
 import { randomBytes } from 'node:crypto';
-import { PET_SCALES, countStep, dragOutcome, dropDuration, dropIn, startTally, wrapUp, type PetScaleName, type PetState, type TaskTally } from '@bob-pet/shared';
+import { PET_SCALES, countStep, dragOutcome, dropDuration, dropIn, migrateSettings, startTally, wrapUp, type PetScaleName, type PetState, type TaskTally } from '@bob-pet/shared';
 import { LocalPetServer } from './ipc-server.js';
 import { WindowsFocusAdapter } from './focus.js';
 import { SettingsStore } from './settings.js';
@@ -394,7 +394,9 @@ async function startup(): Promise<void> {
   if (await store.migrate()) console.log('Adopted settings from the legacy user-data folder');
   const settings = await store.read();
   petWindow = createPetWindow(settings);
-  const devServer = process.env.BOB_PET_DEV_SERVER;
+  // Only a development build follows this. In a packaged pet it is ignored, so nothing
+  // that can set an environment variable can point the window at a page of its choosing.
+  const devServer = app.isPackaged ? undefined : process.env.BOB_PET_DEV_SERVER;
   await petWindow.loadURL(devServer ?? `file://${__dirname}/../renderer/index.html`);
   // The renderer normally asks to be shown; this covers it failing to load at all.
   petWindow.once('ready-to-show', () => setTimeout(() => void reveal(false), 800));
@@ -433,7 +435,9 @@ ipcMain.on('pet:hit', (_event, over: boolean) => {
 ipcMain.handle('pet:drag-end', () => endDrag());
 ipcMain.handle('pet:save-settings', async (_event, update: Record<string, unknown>) => {
   const settings = await store.read();
-  const next = { ...settings, ...update };
+  // Put the merge through the same validation as a settings file read from disk, so the
+  // renderer cannot store a shape the rest of the app does not expect.
+  const next = migrateSettings({ ...settings, ...update });
   await store.write(next);
   petWindow?.webContents.send('pet:settings', next);
 });

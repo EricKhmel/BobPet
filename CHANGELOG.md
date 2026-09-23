@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+### Security
+
+- A repository can no longer decide what the extension runs. `bobPet.companionPath` and
+  `bobPet.ipcPort` are machine-scoped, so a workspace cannot set them, and the extension no
+  longer looks for a companion inside the open folder: a repository that happened to
+  contain `dist\win-unpacked\Bob Pet.exe`, or a stock `electron.exe` and a `main.js`, was
+  enough to get it spawned - and the hook refresh would then write that path into Bob's own
+  settings, where it would have kept running long after the repository was gone. A
+  development checkout still works, but only when BOB_PET_DEV says so.
+- Bob's settings are never replaced when they cannot be read. A file with a stray comma
+  used to be treated as empty and overwritten with nothing but the pet's own hooks, losing
+  everything else in it. The pet now refuses, says so, and leaves the file alone; writes go
+  through a temporary file so an interrupted one cannot leave a half-written settings file.
+- Electron updated from 38.1.2 to 44.4.5, which clears every published advisory against the
+  version the pet ships.
+- A connection to the pet now has five seconds to say who it is, the secret is compared in
+  constant time, and a label can no longer carry invisible characters - a right-to-left
+  override in a file name could otherwise reorder what the pet says Bob is doing.
+- The packaged pet no longer carries its own test files or TypeScript sources, a packaged
+  build ignores `BOB_PET_DEV_SERVER`, the page declares a content security policy, and the
+  download stops if it exceeds the size the release says it is.
+- The release workflow passes the Open VSX token through the environment rather than on the
+  command line, and the test workflow asks for read-only permissions.
+
 ### Changed
 
 - A celebration you pick yourself, from the right-click menu or a command, now stays until

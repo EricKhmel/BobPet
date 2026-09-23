@@ -13,7 +13,9 @@ export type Message =
 export const MAX_LABEL = 120;
 const cleanLabel = (value: unknown): string | undefined => {
   if (typeof value !== 'string') return undefined;
-  const flat = value.replace(/\s+/g, ' ').trim();
+  // Control and format characters are dropped, not just collapsed: a right-to-left
+  // override would let a repository's file name reorder what the pet says Bob is doing.
+  const flat = value.replace(/\p{C}/gu, '').replace(/\s+/g, ' ').trim();
   return flat ? flat.slice(0, MAX_LABEL) : undefined;
 };
 

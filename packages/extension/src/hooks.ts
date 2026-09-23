@@ -5,7 +5,7 @@
  * node with no VS Code API around it, removes the hooks with exactly the same code that
  * installed them.
  */
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 
@@ -67,12 +67,31 @@ export function hookCommand(target: { exe: string; hookScript: string }): string
   ].join(' & ');
 }
 
-export async function readAgentSettings(path: string): Promise<Record<string, unknown>> {
+/**
+ * One agent's settings, and whether they could be read at all.
+ *
+ * The difference matters: a file that is not there yet is an empty object we may safely
+ * write, but a file we cannot parse is someone's configuration that we do not understand.
+ * Treating those the same would replace their models, permissions and their own hooks
+ * with a file containing nothing but ours, which is not recoverable.
+ */
+export type AgentSettings = { settings: Record<string, unknown>; readable: boolean };
+
+export async function readAgentSettings(path: string): Promise<AgentSettings> {
+  let text: string;
   try {
-    const parsed: unknown = JSON.parse(await readFile(path, 'utf8'));
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+    text = await readFile(path, 'utf8');
+  } catch (error) {
+    // No file yet is normal; anything else means we could not look.
+    const missing = (error as NodeJS.ErrnoException).code === 'ENOENT';
+    return { settings: {}, readable: missing };
+  }
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { settings: {}, readable: false };
+    return { settings: parsed as Record<string, unknown>, readable: true };
   } catch {
-    return {};
+    return { settings: {}, readable: false };
   }
 }
 
@@ -90,9 +109,18 @@ export function withoutPetHooks(hooks: Record<string, HookGroup[]>): Record<stri
   return next;
 }
 
-/** Rewrites one agent's settings file, preserving every key that is not ours. */
+/**
+ * Rewrites one agent's settings file, preserving every key that is not ours.
+ *
+ * Refuses to write at all when the existing file could not be read: better to say so than
+ * to replace a configuration we could not understand. The new contents go to a temporary
+ * file first and are renamed into place, so an interrupted write cannot leave a half file.
+ */
 export async function applyHooks(target: HookTarget, entry: HookEntry | undefined): Promise<void> {
-  const settings = await readAgentSettings(target.settings);
+  const { settings, readable } = await readAgentSettings(target.settings);
+  if (!readable) {
+    throw new Error(`${target.settings} could not be read as JSON, so it was left untouched. Fix or move that file, then try again.`);
+  }
   const hooks = withoutPetHooks((settings.hooks ?? {}) as Record<string, HookGroup[]>);
   if (entry) {
     // Every event is a quick, fire-and-forget report; none of them waits on a person.
@@ -102,13 +130,15 @@ export async function applyHooks(target: HookTarget, entry: HookEntry | undefine
   if (Object.keys(hooks).length > 0) next.hooks = hooks;
   else delete next.hooks;
   await mkdir(dirname(target.settings), { recursive: true });
-  await writeFile(target.settings, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+  const staged = `${target.settings}.bob-pet-${process.pid}.tmp`;
+  await writeFile(staged, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+  await rename(staged, target.settings);
 }
 
 
 /** The pet's own hook commands currently installed in one agent's settings. */
 export async function installedPetHooks(target: HookTarget): Promise<string[]> {
-  const settings = await readAgentSettings(target.settings);
+  const { settings } = await readAgentSettings(target.settings);
   const hooks = (settings.hooks ?? {}) as Record<string, HookGroup[]>;
   const commands = new Set<string>();
   for (const groups of Object.values(hooks)) {

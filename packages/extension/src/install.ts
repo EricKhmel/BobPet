@@ -62,9 +62,16 @@ async function fetchTo(url: string, file: string, expectedBytes: number, report:
         const hash = createHash('sha256');
         let received = 0;
         const out = createWriteStream(file);
+        const ceiling = expectedBytes > 0 ? expectedBytes * 1.1 : Number.POSITIVE_INFINITY;
         response.on('data', (chunk: Buffer) => {
           hash.update(chunk);
           received += chunk.length;
+          // The size is known from the release; anything much larger is not our file.
+          if (received > ceiling) {
+            response.destroy();
+            reject(new Error('the download was larger than the release it claims to be'));
+            return;
+          }
           if (total > 0) report('Downloading Bob Pet', received / total);
         });
         response.pipe(out);

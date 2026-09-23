@@ -153,28 +153,17 @@ async function start(): Promise<void> {
     // User configured a valid executable path directly
     log(`Using user-configured companion executable: "${path}"`);
   } else {
-    // Check standard installed location or workspace development / unpacked paths
-    const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
-    const candidates = [
-      // What this extension downloaded for itself, which is how most people will have it.
-      storageRoot && COMPANION_RELEASE.version ? companionExe(storageRoot) : '',
-      // Standard local app installer directory
-      process.env.LOCALAPPDATA ? `${process.env.LOCALAPPDATA}\\Programs\\bob-pet-companion\\Bob Pet.exe` : '',
-      // Workspace win-unpacked build
-      wsRoot ? `${wsRoot}\\BobPet\\dist\\win-unpacked\\Bob Pet.exe` : '',
-      wsRoot ? `${wsRoot}\\dist\\win-unpacked\\Bob Pet.exe` : '',
-      // Development fallback using electron runner and compiled companion main
-      wsRoot ? `${wsRoot}\\BobPet\\node_modules\\electron\\dist\\electron.exe` : '',
-      wsRoot ? `${wsRoot}\\node_modules\\electron\\dist\\electron.exe` : ''
-    ].filter((p): p is string => Boolean(p && existsSync(p)));
+    const candidates = companionCandidates().filter((candidate) => existsSync(candidate));
 
     if (candidates.length > 0) {
       path = candidates[0];
       log(`Discovered companion candidate: "${path}"`);
       if (path.toLowerCase().endsWith('electron.exe')) {
-        const mainScript = existsSync(`${wsRoot}\\BobPet\\apps\\companion\\dist\\main\\main.js`)
-          ? `${wsRoot}\\BobPet\\apps\\companion\\dist\\main\\main.js`
-          : `${wsRoot}\\apps\\companion\\dist\\main\\main.js`;
+        // Only reachable in a development checkout (see companionCandidates).
+        const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+        const mainScript = existsSync(join(wsRoot, 'BobPet', 'apps', 'companion', 'dist', 'main', 'main.js'))
+          ? join(wsRoot, 'BobPet', 'apps', 'companion', 'dist', 'main', 'main.js')
+          : join(wsRoot, 'apps', 'companion', 'dist', 'main', 'main.js');
         spawnArgs = [mainScript];
         log(`Using development Electron runner with main script: "${mainScript}"`);
       }
@@ -284,6 +273,40 @@ async function chooseState(): Promise<void> {
 
 
 /**
+ * Every place the companion may legitimately be, best first.
+ *
+ * Deliberately nothing from the open folder. Earlier versions looked for a build inside
+ * the workspace, which meant that merely opening a repository containing
+ * `dist\win-unpacked\Bob Pet.exe` - or a stock `electron.exe` and a `main.js` - was
+ * enough to have it spawned, and `refreshHooks` would then write that path into Bob's
+ * own settings, where it would keep running long after the repository was gone. A
+ * checkout is still supported for development, but only when the person running it says
+ * so by setting BOB_PET_DEV, never because of what a repository happens to contain.
+ *
+ * `bobPet.companionPath` is machine-scoped in the manifest for the same reason: a
+ * workspace must not be able to choose which executable this extension starts.
+ */
+function companionCandidates(): string[] {
+  const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+  const localApps = process.env.LOCALAPPDATA ?? '';
+  const development = process.env.BOB_PET_DEV && wsRoot
+    ? [
+        join(wsRoot, 'BobPet', 'dist', 'win-unpacked', 'Bob Pet.exe'),
+        join(wsRoot, 'dist', 'win-unpacked', 'Bob Pet.exe'),
+        join(wsRoot, 'BobPet', 'node_modules', 'electron', 'dist', 'electron.exe'),
+        join(wsRoot, 'node_modules', 'electron', 'dist', 'electron.exe')
+      ]
+    : [];
+  return [
+    executable(),
+    // What this extension downloaded for itself, which is how most people will have it.
+    storageRoot && COMPANION_RELEASE.version ? companionExe(storageRoot) : '',
+    localApps ? join(localApps, 'Programs', 'bob-pet-companion', 'Bob Pet.exe') : '',
+    ...development
+  ].filter((candidate): candidate is string => Boolean(candidate));
+}
+
+/**
  * Locates the companion and the hook script that ships beside it.
  *
  * Paths are assembled with `join` rather than backslash string literals: a single `\`
@@ -291,19 +314,8 @@ async function chooseState(): Promise<void> {
  * became a carriage return followed by mangled text, and the hook could never be found.
  */
 function resolveCompanion(): { exe: string; hookScript: string } | undefined {
-  const configured = executable();
   const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
-  const localApps = process.env.LOCALAPPDATA ?? '';
-  const candidates = [
-    configured,
-    // What this extension downloaded for itself, which is how most people will have it.
-    storageRoot && COMPANION_RELEASE.version ? companionExe(storageRoot) : '',
-    localApps ? join(localApps, 'Programs', 'bob-pet-companion', 'Bob Pet.exe') : '',
-    wsRoot ? join(wsRoot, 'BobPet', 'dist', 'win-unpacked', 'Bob Pet.exe') : '',
-    wsRoot ? join(wsRoot, 'dist', 'win-unpacked', 'Bob Pet.exe') : '',
-    wsRoot ? join(wsRoot, 'BobPet', 'node_modules', 'electron', 'dist', 'electron.exe') : '',
-    wsRoot ? join(wsRoot, 'node_modules', 'electron', 'dist', 'electron.exe') : ''
-  ].filter((candidate): candidate is string => Boolean(candidate && existsSync(candidate)));
+  const candidates = companionCandidates().filter((candidate) => existsSync(candidate));
 
   for (const exe of candidates) {
     if (exe.toLowerCase().endsWith('electron.exe')) {
@@ -318,6 +330,26 @@ function resolveCompanion(): { exe: string; hookScript: string } | undefined {
     return { exe, hookScript: join(dirname(exe), 'resources', 'app.asar', 'dist', 'main', 'hook.js') };
   }
   return undefined;
+}
+
+/**
+ * Applies a hook change, and says so plainly if Bob's settings could not be read. They are
+ * left exactly as they were in that case, so the user can fix the file and try again.
+ */
+async function writeHooks(entry: HookEntry | undefined): Promise<boolean> {
+  for (const target of HOOK_TARGETS) {
+    try {
+      await applyHooks(target, entry);
+      log(`${entry ? 'Installed' : 'Removed'} hooks ${entry ? 'into' : 'from'} ${target.settings}`);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      log(`Left Bob's settings alone: ${reason}`);
+      getLogger().show(true);
+      void vscode.window.showErrorMessage(`Bob Pet did not change Bob's settings: ${reason}`);
+      return false;
+    }
+  }
+  return true;
 }
 
 async function connect(options: { ask?: boolean } = {}): Promise<void> {
@@ -348,10 +380,7 @@ async function connect(options: { ask?: boolean } = {}): Promise<void> {
   if (choice !== 'Add hooks') return;
 
   const entry: HookEntry = { type: 'command', command, timeout: HOOK_TIMEOUT_S };
-  for (const target of HOOK_TARGETS) {
-    await applyHooks(target, entry);
-    log(`Installed hooks into ${target.settings}`);
-  }
+  if (!(await writeHooks(entry))) return;
 
   // Run it once exactly as an agent would, so a broken wiring is reported now rather
   // than as a pet that silently never moves.
@@ -389,10 +418,7 @@ function smokeTest(command: string): Promise<{ ok: boolean; detail: string }> {
 }
 
 async function disconnect(): Promise<void> {
-  for (const target of HOOK_TARGETS) {
-    await applyHooks(target, undefined);
-    log(`Removed hooks from ${target.settings}`);
-  }
+  if (!(await writeHooks(undefined))) return;
   void vscode.window.showInformationMessage('Bob Pet hooks removed.');
 }
 
@@ -477,8 +503,13 @@ async function refreshHooks(): Promise<void> {
   for (const target of HOOK_TARGETS) {
     const existing = await installedPetHooks(target);
     if (existing.length === 0 || existing.every((command) => command === wanted)) continue;
-    await applyHooks(target, { type: 'command', command: wanted, timeout: HOOK_TIMEOUT_S });
-    log(`Updated the pet's hooks in ${target.settings} to the current companion`);
+    try {
+      await applyHooks(target, { type: 'command', command: wanted, timeout: HOOK_TIMEOUT_S });
+      log(`Updated the pet's hooks in ${target.settings} to the current companion`);
+    } catch (error) {
+      // A refresh runs unasked at startup, so it reports quietly and changes nothing.
+      log(`Could not refresh the hooks: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }
 }
 

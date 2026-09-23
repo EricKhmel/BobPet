@@ -2,7 +2,7 @@
 
 ## Local IPC threat model
 
-The companion listener binds exclusively to `127.0.0.1`; it never binds to a LAN address. A new random 256-bit secret is generated for each launch (or passed once from the extension launch command), and the first protocol message must authenticate it. Each newline-delimited payload has a 4 KiB cap, exact schema validation, exact version validation, and a five-second unauthenticated timeout. Secrets are not logged. One secret per launch is written to `session.json` in the companion's
+The companion listener binds exclusively to `127.0.0.1`; it never binds to a LAN address. A new random 256-bit secret is generated for each launch (or passed once from the extension launch command), and the first protocol message must authenticate it. Each newline-delimited payload has a 8 KiB cap, exact schema validation, exact version validation, and a five-second unauthenticated timeout. Secrets are not logged. One secret per launch is written to `session.json` in the companion's
 own user-data directory so that IBM Bob's short-lived hook processes can authenticate; it is
 owner-only, regenerated on every launch, and deleted on quit. On Windows that directory is
 already per-user, and a process running as this user could equally read the extension's memory

@@ -225,3 +225,16 @@ test("a report can say it came from Bob's own hooks, and nothing else gets in", 
   assert.equal(parseMessage({ version: 1, type: 'set-state', state: 'IDLE', source: true }), undefined);
   assert.equal(parseMessage({ version: 1, type: 'set-state', state: 'IDLE', sneaky: 1 }), undefined);
 });
+
+test('a spoken line cannot carry invisible characters', () => {
+  // U+202E reverses what follows it: a file name could make the pet claim something else.
+  const spoofed = parseMessage({ version: 1, type: 'set-state', state: 'WORKING', label: 'Editing \u202Egnj.exe' });
+  assert.equal((spoofed as { label?: string }).label, 'Editing gnj.exe');
+
+  const controls = parseMessage({ version: 1, type: 'set-state', state: 'WORKING', label: 'Running \u0000rm\u001b[2K -rf' });
+  assert.equal((controls as { label?: string }).label, 'Running rm[2K -rf');
+
+  // Ordinary text is untouched apart from having its whitespace collapsed.
+  const plain = parseMessage({ version: 1, type: 'set-state', state: 'WORKING', label: '  Running   npm test\n' });
+  assert.equal((plain as { label?: string }).label, 'Running npm test');
+});
