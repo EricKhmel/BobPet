@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { PetState, StoredSettings } from '@bob-pet/shared';
-import { PET_GRID_ROWS, PET_HEADROOM_ROWS, PET_SCALES, STILL_RUNNING_MS, defaultSettings, formatElapsed, petHeightFor } from '@bob-pet/shared';
+import { PET_GRID_ROWS, PET_HEADROOM_ROWS, PET_SCALES, STILL_RUNNING_MS, defaultSettings, dropDuration, dropIn, formatElapsed, petHeightFor } from '@bob-pet/shared';
 import './style.css';
 
 type Pixel = [number, number, number, number, string];
@@ -75,8 +75,13 @@ const HAMMER_LIT = '#78a9ff';
 const HAMMER_HAFT = '#6929c4';
 const HAMMER_HAFT_LIT = '#a56eff';
 
-export type Motion = { dragging: boolean; vx: number; vy: number; sinceRelease: number };
-const STILL: Motion = { dragging: false, vx: 0, vy: 0, sinceRelease: -1 };
+/**
+ * `arriving`, like `sinceRelease`, is kept as the timestamp the drop-in began and handed
+ * to the drawing code as an age, so every frame of it is measured off one clock.
+ * `fellFrom` is how far above its resting place the pet was dropped, in screen pixels.
+ */
+export type Motion = { dragging: boolean; vx: number; vy: number; sinceRelease: number; arriving: number; fellFrom: number };
+const STILL: Motion = { dragging: false, vx: 0, vy: 0, sinceRelease: -1, arriving: -1, fellFrom: 0 };
 
 const CENTRE = 32;
 const CROWN = HAT_TOP;
@@ -420,7 +425,9 @@ function pixels(state: PetState, tick: number, motion: Motion = STILL): Pixel[] 
     }
   }
 
-  return posePixels(p, lean, releaseSquash(motion.sinceRelease));
+  // The window is falling (see entrance.ts); the squash on each landing belongs here.
+  const arrival = motion.arriving >= 0 ? dropIn(motion.arriving, motion.fellFrom).squash : 0;
+  return posePixels(p, lean, releaseSquash(motion.sinceRelease) + arrival);
 }
 
 // Synthesized Web Audio API sound (no external audio assets)
@@ -522,7 +529,11 @@ function Robot({ state, paused, muted, motion }: { state: PetState; paused: bool
     const calm = paused || matchMedia('(prefers-reduced-motion: reduce)').matches;
     const pose: Motion = calm
       ? STILL
-      : { ...motion, sinceRelease: motion.sinceRelease < 0 ? -1 : performance.now() - motion.sinceRelease };
+      : {
+          ...motion,
+          sinceRelease: motion.sinceRelease < 0 ? -1 : performance.now() - motion.sinceRelease,
+          arriving: motion.arriving < 0 ? -1 : performance.now() - motion.arriving
+        };
 
     // Without the animation loop nothing would advance the dissolve, so it is skipped.
     const age = leaving.current ? performance.now() - leaving.current.at : Infinity;
@@ -637,9 +648,16 @@ function App(): React.JSX.Element {
       setBubble(next);
       setPetBox({ left: petLeft, size: petSize });
     });
+    // Registered before asking to be shown, since the reply to that starts the drop-in.
+    window.bobPet.onEntrance(({ height }) => {
+      setMotion((previous) => ({ ...previous, arriving: performance.now(), fellFrom: height }));
+      window.setTimeout(() => setMotion((previous) => ({ ...previous, arriving: -1 })), dropDuration(height));
+    });
+    void window.bobPet.ready({ reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches });
     window.bobPet.onDrag(({ dragging, vx, vy }) => {
       // sinceRelease holds the drop timestamp; the renderer turns it into an age.
       setMotion((previous) => ({
+        ...previous,
         dragging,
         vx,
         vy,

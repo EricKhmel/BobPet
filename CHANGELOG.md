@@ -6,6 +6,13 @@ Artifact names stay at `0.1.0`; reinstall over the existing companion to pick th
 
 ### Added
 
+- The pet drops in from the top of the screen and bounces to a stop when it launches. The
+  window is only as tall as the pet, so the fall is the window moving while the renderer
+  squashes him on each landing, both off one timeline. Gravity is constant, so the further
+  he has to fall the longer he takes: about a second from halfway down a screen. Reduced
+  motion or a paused pet simply appears.
+- New installs start at Medium (96px) instead of Standard. Anyone who has already chosen a
+  size keeps it.
 - A timer in the speech bubble. Once a step has run for 12 seconds the line reads, for
   example, "Still going — Running npm test · 14s", and it counts up every second.
 - A wrap-up when Bob finishes: "All done in 4m 12s: 12 steps, 3 files changed, 2 commands

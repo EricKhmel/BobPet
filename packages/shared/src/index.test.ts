@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PET_STATES, PET_SCALES, clampPosition, migrateSettings, parseMessage, defaultSettings, dragOutcome, stateForHook, describeHook, startTally, countStep, wrapUp, formatElapsed } from './index.js';
+import { PET_STATES, PET_SCALES, clampPosition, migrateSettings, parseMessage, defaultSettings, dragOutcome, stateForHook, describeHook, dropDuration, dropIn, startTally, countStep, wrapUp, formatElapsed } from './index.js';
 
 test('protocol validation: accepts exact protocol messages and valid states', () => {
   for (const state of PET_STATES) {
@@ -47,13 +47,13 @@ test('scale calculations: all specified scales match exact multipliers and pixel
 
 test('settings migration: handles defaults, migrations, and bounds checking', () => {
   const defaults = defaultSettings();
-  assert.equal(defaults.scale, 'standard');
+  assert.equal(defaults.scale, 'medium', 'a pet nobody has sized yet should be comfortably visible');
   assert.equal(defaults.muted, true); // Muted by default per requirements
   assert.equal(defaults.paused, false);
   assert.equal(defaults.animationEnabled, true);
 
   // Invalid scale falls back to standard
-  assert.equal(migrateSettings({ scale: 'huge' }).scale, 'standard');
+  assert.equal(migrateSettings({ scale: 'huge' }).scale, 'medium');
   // Valid scale is preserved
   assert.equal(migrateSettings({ scale: 'large', muted: false }).scale, 'large');
   assert.equal(migrateSettings({ scale: 'large', muted: false }).muted, false);
@@ -163,4 +163,50 @@ test('the wrap-up counts steps, distinct files changed and commands run', () => 
   assert.equal(formatElapsed(59_999), '59s');
   assert.equal(formatElapsed(65_000), '1m 05s');
   assert.equal(formatElapsed(3_900_000), '1h 05m');
+});
+
+test('the drop-in falls from where it was dropped, bounces smaller, and ends still', () => {
+  const HIGH = 900;
+  const total = dropDuration(HIGH);
+  assert.ok(total > 1_000 && total < 3_000, `a screen-height fall should take a second or two, not ${total}ms`);
+  // A longer fall takes longer, as gravity says it should.
+  assert.ok(dropDuration(200) < dropDuration(HIGH));
+  assert.equal(dropDuration(0), 0, 'a pet already at the top has nowhere to fall from');
+
+  assert.deepEqual(dropIn(-5, HIGH), { rise: HIGH, squash: 0 }, 'he waits up there until released');
+  assert.equal(dropIn(0, HIGH).rise, HIGH);
+
+  // Falling: always downward, never past the floor, and squashed only on landing.
+  let previous = HIGH;
+  let landing = -1;
+  for (let ms = 10; ms < total; ms += 5) {
+    const { rise, squash } = dropIn(ms, HIGH);
+    assert.ok(rise >= 0, 'never below its resting place');
+    if (landing < 0 && rise >= previous) landing = ms;
+    // Well clear of the floor on the way down for the first time: no landing has happened
+    // yet, so nothing is squashed. Later descents can still be springing back from one.
+    if (landing < 0 && rise > 5) assert.equal(squash, 0, `squash belongs to the landing, not the fall (${ms}ms)`);
+    previous = rise;
+  }
+  assert.ok(landing > 0 && landing < total / 2, 'the first landing comes well before the end');
+
+  // Each bounce is lower than the one before it.
+  const peak = (from: number, to: number): number => {
+    let best = 0;
+    for (let ms = from; ms < to; ms += 2) best = Math.max(best, dropIn(ms, HIGH).rise);
+    return best;
+  };
+  const first = peak(landing, landing + (total - landing) / 2);
+  const second = peak(landing + (total - landing) / 2, total);
+  assert.ok(first > second && second > 0, 'bounces get smaller');
+  assert.ok(first < HIGH / 2, 'and never near the height he was dropped from');
+
+  // The landing squash is hardest first, springs back, and a short fall lands softer.
+  const hit = dropIn(landing, HIGH).squash;
+  assert.ok(hit > 0.2, `the first landing should squash him (${hit})`);
+  assert.equal(dropIn(landing + 140, HIGH).squash, 0, 'the squash springs back, not lingers');
+  assert.ok(dropIn(dropDuration(60), 60).squash <= hit, 'a short drop lands softer');
+
+  assert.deepEqual(dropIn(total, HIGH), { rise: 0, squash: 0 }, 'ends exactly where he belongs');
+  assert.deepEqual(dropIn(total + 5_000, HIGH), { rise: 0, squash: 0 }, 'and stays there');
 });

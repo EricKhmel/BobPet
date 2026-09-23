@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, screen } from 'electron';
 import { randomBytes } from 'node:crypto';
-import { PET_SCALES, countStep, dragOutcome, startTally, wrapUp, type PetScaleName, type PetState, type TaskTally } from '@bob-pet/shared';
+import { PET_SCALES, countStep, dragOutcome, dropDuration, dropIn, startTally, wrapUp, type PetScaleName, type PetState, type TaskTally } from '@bob-pet/shared';
 import { LocalPetServer } from './ipc-server.js';
 import { WindowsFocusAdapter } from './focus.js';
 import { SettingsStore } from './settings.js';
@@ -29,7 +29,7 @@ const argument = (name: string): string | undefined => {
 };
 const notify = (body: string): void => { if (Notification.isSupported()) new Notification({ title: 'Bob Pet', body }).show(); };
 /** Saves where the pet itself is, not the window around it, so a size change keeps it put. */
-async function persistBounds(): Promise<void> { if (!petWindow || drag) return; const settings = await store.read(); const { x, y } = petWindow.getBounds(); await store.write({ ...settings, position: petOrigin({ x, y }, layoutFor(petSize(settings))) }); }
+async function persistBounds(): Promise<void> { if (!petWindow || drag || entranceTimer) return; const settings = await store.read(); const { x, y } = petWindow.getBounds(); await store.write({ ...settings, position: petOrigin({ x, y }, layoutFor(petSize(settings))) }); }
 const CELEBRATE_MS = 6400;
 /** The task in progress, if any: when it began and what it has done so far. */
 let task: TaskTally | undefined;
@@ -106,6 +106,59 @@ async function setState(next: PetState, label?: string): Promise<void> {
   }
   const { idleMinutes } = await store.read();
   sleepTimer = setTimeout(() => void setState('SLEEPING'), Math.max(1, idleMinutes) * 60_000);
+}
+
+/**
+ * The pet drops in from above and bounces to a stop when it launches.
+ *
+ * The window is only as tall as the pet, so the fall is the window moving: the renderer
+ * runs the same timeline (see entrance.ts) to squash him on each landing. The saved
+ * position is left alone throughout, since none of this is the user moving him.
+ */
+const ENTRANCE_FRAME_MS = 16;
+let entranceTimer: NodeJS.Timeout | undefined;
+
+function playEntrance(): void {
+  if (!petWindow) return;
+  const [x, restY] = petWindow.getPosition();
+  // He falls from the top of the screen he is on, so a pet already near the top has a
+  // correspondingly short fall rather than starting off screen where it cannot be seen.
+  const ceiling = screen.getDisplayNearestPoint({ x, y: restY }).workArea.y;
+  const height = Math.max(0, restY - ceiling);
+  const total = dropDuration(height);
+  const at = (ms: number): number => Math.round(restY - dropIn(ms, height).rise);
+  petWindow.setPosition(x, at(0));
+  petWindow.showInactive();
+  // The renderer runs the same timeline for the squash, so it needs the same fall.
+  petWindow.webContents.send('pet:entrance', { height });
+  const started = Date.now();
+  entranceTimer = setInterval(() => {
+    const elapsed = Date.now() - started;
+    if (!petWindow || elapsed >= total) {
+      clearInterval(entranceTimer);
+      entranceTimer = undefined;
+      petWindow?.setPosition(x, restY);
+      return;
+    }
+    petWindow.setPosition(x, at(elapsed));
+  }, ENTRANCE_FRAME_MS);
+}
+
+/**
+ * Shows the pet once, either dropping in or simply appearing. The renderer asks for this
+ * as soon as it has painted, since only it knows whether the user asked for less motion;
+ * a timer covers a renderer that never gets that far.
+ */
+let revealed = false;
+async function reveal(withEntrance: boolean): Promise<void> {
+  if (revealed || !petWindow) return;
+  revealed = true;
+  const settings = await store.read();
+  if (!withEntrance || settings.paused) {
+    petWindow.showInactive();
+    return;
+  }
+  playEntrance();
 }
 
 /** The pet's own overlay must never be mistaken for the IBM Bob window. */
@@ -325,7 +378,8 @@ async function startup(): Promise<void> {
   petWindow = createPetWindow(settings);
   const devServer = process.env.BOB_PET_DEV_SERVER;
   await petWindow.loadURL(devServer ?? `file://${__dirname}/../renderer/index.html`);
-  petWindow.once('ready-to-show', () => petWindow?.showInactive());
+  // The renderer normally asks to be shown; this covers it failing to load at all.
+  petWindow.once('ready-to-show', () => setTimeout(() => void reveal(false), 800));
   petWindow.on('moved', () => void persistBounds());
   petWindow.webContents.on('context-menu', () => contextMenu());
 
@@ -340,7 +394,7 @@ async function startup(): Promise<void> {
 
 app.whenReady().then(startup).catch((error: unknown) => { console.error('Bob Pet startup failed', error); app.quit(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-app.on('before-quit', () => { clearStepWatch(); void server?.close(); focusAdapter.dispose(); if (sessionSecret) void removeSessionFile(app.getPath('userData'), sessionSecret); });
+app.on('before-quit', () => { clearStepWatch(); clearInterval(entranceTimer); entranceTimer = undefined; void server?.close(); focusAdapter.dispose(); if (sessionSecret) void removeSessionFile(app.getPath('userData'), sessionSecret); });
 ipcMain.handle('pet:settings', () => store.read());
 ipcMain.handle('pet:set-scale', (_event, scale: PetScaleName) => resize(scale));
 ipcMain.handle('pet:set-state', (_event, next: PetState) => setState(next));
@@ -349,6 +403,7 @@ ipcMain.handle('pet:focus', () => {
   return focusBob();
 });
 ipcMain.handle('pet:menu', () => contextMenu());
+ipcMain.handle('pet:ready', (_event, info: { reducedMotion?: boolean } | undefined) => reveal(!info?.reducedMotion));
 ipcMain.handle('pet:drag-start', () => startDrag());
 // The renderer reports whether the cursor is over something of the pet's. Elsewhere the
 // window lets the mouse through, so its clear room never blocks what is behind it. A drag

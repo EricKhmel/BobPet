@@ -54,7 +54,7 @@ export const PET_GRID_ROWS = 64 + PET_HEADROOM_ROWS;
 /** On-screen height of the pet at a given width, keeping its pixels square. */
 export const petHeightFor = (width: number): number => Math.round((width * PET_GRID_ROWS) / 64);
 export type StoredSettings = { schemaVersion: 1; scale: PetScaleName; muted: boolean; paused: boolean; animationEnabled: boolean; bobExecutablePath?: string; position?: { x: number; y: number }; idleMinutes: number };
-export const defaultSettings = (): StoredSettings => ({ schemaVersion: 1, scale: 'standard', muted: true, paused: false, animationEnabled: true, idleMinutes: 15 });
+export const defaultSettings = (): StoredSettings => ({ schemaVersion: 1, scale: 'medium', muted: true, paused: false, animationEnabled: true, idleMinutes: 15 });
 export function migrateSettings(value: unknown): StoredSettings {
   const defaults = defaultSettings();
   if (!value || typeof value !== 'object' || Array.isArray(value)) return defaults;
@@ -127,3 +127,4 @@ export function stateForHook(payload: unknown): PetState | undefined {
 
 export { describeHook, describeTool } from './describe.js';
 export { STILL_RUNNING_MS, formatElapsed, startTally, countStep, wrapUp, type TaskTally } from './summary.js';
+export { dropDuration, dropIn, type Drop } from './entrance.js';
