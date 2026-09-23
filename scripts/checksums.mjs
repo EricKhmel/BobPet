@@ -11,8 +11,9 @@ try {
   throw new Error('dist/ does not exist; package the release before generating checksums.');
 }
 
-const releaseFiles = entries.filter((name) => /\.(exe|vsix)$/i.test(name));
-if (!releaseFiles.length) throw new Error('No installer or VSIX was found in dist/.');
+// The zip belongs here too: it is what the extension downloads.
+const releaseFiles = entries.filter((name) => /\.(exe|vsix|zip)$/i.test(name));
+if (!releaseFiles.length) throw new Error('No installer, VSIX or zip was found in dist/.');
 
 const lines = await Promise.all(
   releaseFiles.sort().map(async (name) => {
