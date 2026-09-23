@@ -6,6 +6,9 @@ Artifact names stay at `0.1.0`; reinstall over the existing companion to pick th
 
 ### Added
 
+- The extension is published for Windows only and says so on macOS and Linux instead of
+  half-working: the commands report it, the status bar says it, and nothing is downloaded.
+
 - Installing the extension is now all it takes. On first run it asks once, then downloads
   the companion from this project's GitHub release, checks it against a fingerprint built
   into the extension, unpacks it into its own storage folder and wires up Bob's hooks. It

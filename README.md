@@ -1,6 +1,8 @@
 # Bob Pet
 
-Bob Pet is a Windows-first, independent pixel-art desktop companion for people using IBM Bob IDE. It is not an IBM product and is not affiliated with, endorsed by, or guaranteed compatible with IBM Bob.
+Bob Pet is an independent pixel-art desktop companion for people using IBM Bob IDE. It is not an IBM product and is not affiliated with, endorsed by, or guaranteed compatible with IBM Bob.
+
+**Windows only for now.** IBM Bob also runs on macOS and Linux; the pet does not yet, because focusing Bob, the hook command lines and the packaging are all Windows-specific. The extension says so rather than half-working if it is installed elsewhere.
 
 The transparent overlay runs without an extension: it can stay above other windows, be repositioned, use five crisp pixel sizes, animate locally, and make a user-initiated, best-effort request to focus a configured Bob window. The optional VSIX adds commands and a status-bar entry to VS Code-compatible hosts. It never modifies IBM Bob.
 

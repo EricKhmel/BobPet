@@ -156,6 +156,8 @@ async function start(): Promise<void> {
     // Check standard installed location or workspace development / unpacked paths
     const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
     const candidates = [
+      // What this extension downloaded for itself, which is how most people will have it.
+      storageRoot && COMPANION_RELEASE.version ? companionExe(storageRoot) : '',
       // Standard local app installer directory
       process.env.LOCALAPPDATA ? `${process.env.LOCALAPPDATA}\\Programs\\bob-pet-companion\\Bob Pet.exe` : '',
       // Workspace win-unpacked build
@@ -482,10 +484,31 @@ async function refreshHooks(): Promise<void> {
 
 let storageRoot = '';
 
+/**
+ * The pet is a Windows application: it is focused, hooked and packaged with Windows-only
+ * machinery. The extension is published for Windows alone, so most hosts will not even
+ * offer it elsewhere, but one installed by hand says so plainly rather than failing in
+ * the middle of a download.
+ */
+const WINDOWS_ONLY = 'Bob Pet works on Windows only for now. Support for macOS and Linux is not ready yet.';
+const COMMAND_IDS = ['bobPet.start', 'bobPet.stop', 'bobPet.focus', 'bobPet.setState', 'bobPet.connect', 'bobPet.disconnect', 'bobPet.openSettings'];
+
 export function activate(context: vscode.ExtensionContext): void {
   status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   showStatus('Start Bob Pet', 'bobPet.start');
   storageRoot = context.globalStorageUri.fsPath;
+
+  if (process.platform !== 'win32') {
+    log(`${WINDOWS_ONLY} (this is ${process.platform})`);
+    showStatus('Bob Pet: Windows only');
+    void vscode.window.showWarningMessage(WINDOWS_ONLY);
+    context.subscriptions.push(
+      status,
+      getLogger(),
+      ...COMMAND_IDS.map((id) => vscode.commands.registerCommand(id, () => vscode.window.showWarningMessage(WINDOWS_ONLY)))
+    );
+    return;
+  }
 
   void (async () => {
     await refreshHooks();
