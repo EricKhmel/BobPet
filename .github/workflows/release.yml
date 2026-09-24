@@ -38,14 +38,22 @@ jobs:
       - name: Checksums
         run: npm run checksums
 
-      # Skipped until OPEN_VSX_TOKEN is added to the repository's secrets.
+      # The token check is inside the step on purpose. As a step-level `if` it silently
+      # skipped every time - a step's own env is not reliably available to its own
+      # condition - and the run still went green, so 0.1.3 built and published nothing.
+      # ovsx reads OVSX_PAT from the environment; passing it as an argument would put the
+      # token on the command line, where anything on the runner could read it.
       - name: Publish to Open VSX
         env:
           OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}
-        if: ${{ env.OVSX_PAT != '' }}
-        # ovsx reads OVSX_PAT from the environment; passing it as an argument would put
-        # the token on the command line, where anything on the runner can read it.
-        run: npx --yes ovsx publish $env:VSIX
+        shell: bash
+        run: |
+          if [ -z "$OVSX_PAT" ]; then
+            echo "No OPEN_VSX_TOKEN secret is set, so nothing was published."
+            exit 0
+          fi
+          echo "Publishing $VSIX to Open VSX"
+          npx --yes ovsx publish "$VSIX"
 
       - name: Keep the build with the tag
         uses: softprops/action-gh-release@v2
