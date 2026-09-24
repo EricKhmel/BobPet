@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.1.2 — 2026-09-24
+
+The pet ships inside the extension, and the security pass below landed before anything was published.
 
 ### Changed
 

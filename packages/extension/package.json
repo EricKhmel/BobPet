@@ -1,7 +1,7 @@
 {
   "name": "bob-pet",
   "displayName": "Bob Pet",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "bob-pet-erickhmel",
   "description": "A pixel-art desktop pet that reacts to what IBM Bob is doing. Windows only for now; macOS and Linux are not supported yet. Not affiliated with IBM.",
   "license": "MIT",
@@ -81,10 +81,10 @@
     "vscode:uninstall": "node ./dist/uninstall.js",
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --test dist/**/*.test.js",
-    "package": "npm run build && node ../../scripts/bundle-companion.mjs && vsce package --target win32-x64 --out ../../dist/bob-pet-0.1.1.vsix"
+    "package": "npm run build && node ../../scripts/bundle-companion.mjs && vsce package --target win32-x64 --out ../../dist/bob-pet-0.1.2.vsix"
   },
   "dependencies": {
-    "@bob-pet/shared": "0.1.1"
+    "@bob-pet/shared": "0.1.2"
   },
   "devDependencies": {
     "@types/node": "24.5.2",

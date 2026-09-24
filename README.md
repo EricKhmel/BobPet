@@ -29,6 +29,6 @@ npm run checksums
 
 Use `npm run dev --workspace=@bob-pet/companion` for the renderer. Vite is deliberately limited to `127.0.0.1:5173`.
 
-The intended release files are `dist/bob-pet-companion-0.1.1-win-x64.exe`, `dist/bob-pet-0.1.1.vsix`, and `dist/SHA256SUMS.txt`. The installer is signing-ready, not signed; add an organization-issued certificate in the release pipeline.
+The intended release files are `dist/bob-pet-companion-0.1.2-win-x64.exe`, `dist/bob-pet-0.1.2.vsix`, and `dist/SHA256SUMS.txt`. The installer is signing-ready, not signed; add an organization-issued certificate in the release pipeline.
 
 See [installation](docs/INSTALL.md), [integration boundary](docs/INTEGRATION.md), [test checklist](docs/TESTING.md), and [security](SECURITY.md).
