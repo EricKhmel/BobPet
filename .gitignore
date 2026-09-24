@@ -11,3 +11,6 @@ refpic.png
 packages/shared/src/*.js
 packages/shared/src/*.js.map
 packages/shared/src/index.d.ts
+
+# The companion is copied in at package time.
+packages/extension/companion/

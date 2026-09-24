@@ -4,17 +4,15 @@
 
 1. In IBM Bob, open **Extensions** and install **Bob Pet** (or **Install from VSIX…** with
    `bob-pet-0.1.1.vsix`).
-2. Answer **Set up Bob Pet** when it asks. That one answer covers both things it needs
-   your permission for: a one-time download of the pet itself (about 110MB), and the hooks
-   in `~/.bob/settings/settings.json` that let it see what Bob is doing.
+2. Answer **Set up Bob Pet** when it asks. The pet itself ships inside the extension; the
+   only thing it needs permission for is the hooks in `~/.bob/settings/settings.json` that
+   let it see what Bob is doing.
 3. The pet drops in from the top of the screen when it is ready. Right-click it for state,
    size, pause and quit; drag it anywhere; its position and preferences are saved locally.
 
-The download comes from this project's GitHub releases and is checked against a
-fingerprint built into the extension before it is run; a file that does not match is
-discarded. It lands in the extension's own storage folder, so nothing is installed
-system-wide and no admin rights are needed. Answering **Cancel** leaves everything alone,
-and nothing is asked again until you run a Bob Pet command yourself.
+Nothing is downloaded and nothing is installed system-wide, so no admin rights are needed.
+Answering **Cancel** leaves everything alone, and nothing is asked again until you run a Bob
+Pet command yourself.
 
 After that, the pet starts whenever Bob opens. Turn that off with `bobPet.autoStart`.
 
@@ -42,8 +40,8 @@ The VSIX is a generic VS Code-compatible extension. Its installation and command
 
 ## Uninstall
 
-Uninstalling the extension removes its hooks from Bob's settings and deletes the pet it
-downloaded; the host runs that cleanup the next time it starts. A companion you installed
+Uninstalling the extension removes its hooks from Bob's settings and takes the pet with it;
+the host runs that cleanup the next time it starts. A companion you installed
 yourself is removed from Windows Settings → Apps. Neither action alters IBM Bob files.
 Local Bob Pet settings may remain in the app data folder and can be removed manually.
 
@@ -55,7 +53,5 @@ Local Bob Pet settings may remain in the app data folder and can be removed manu
   not need to be free: if `bobPet.ipcPort` is taken the pet takes any free port instead and
   publishes it in `session.json`, where the hooks and the extension look it up. No
   firewall/LAN configuration is required.
-- **The download failed:** The notification offers **Try again**. A download that does not
-  match its fingerprint is always discarded rather than run; the Bob Pet output channel
-  records what was expected and what arrived. You can also install the companion yourself
-  and set `bobPet.companionPath`.
+- **The pet cannot be found:** The Bob Pet output channel says where it looked. You can
+  always install the companion yourself and point `bobPet.companionPath` at it.

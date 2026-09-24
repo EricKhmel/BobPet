@@ -3,6 +3,7 @@
 src/**
 tsconfig.json
 **/*.map
+!companion/**
 **/*.test.*
 node_modules/**
 ../**

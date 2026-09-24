@@ -8,8 +8,7 @@ import { join, dirname } from 'node:path';
 import { exec, spawn, type ChildProcess } from 'node:child_process';
 import { type PetState } from '@bob-pet/shared';
 import { HOOK_EVENTS, HOOK_TARGETS, HOOK_TIMEOUT_S, applyHooks, hookCommand, installedPetHooks, type HookEntry } from './hooks.js';
-import { canDownload, companionExe, ensureDownloadedCompanion } from './install.js';
-import { COMPANION_RELEASE } from './release.js';
+import { COMPANION_EXE } from './install.js';
 
 let companion: ChildProcess | undefined;
 let secret: string | undefined;
@@ -299,8 +298,8 @@ function companionCandidates(): string[] {
     : [];
   return [
     executable(),
-    // What this extension downloaded for itself, which is how most people will have it.
-    storageRoot && COMPANION_RELEASE.version ? companionExe(storageRoot) : '',
+    // The copy that ships inside this extension, which is how everyone will have it.
+    extensionRoot ? join(extensionRoot, 'companion', COMPANION_EXE) : '',
     localApps ? join(localApps, 'Programs', 'bob-pet-companion', 'Bob Pet.exe') : '',
     ...development
   ].filter((candidate): candidate is string => Boolean(candidate));
@@ -434,23 +433,25 @@ async function disconnect(): Promise<void> {
 const DECLINED = 'bobPet.declinedSetup';
 
 async function setUp(context: vscode.ExtensionContext, asked: boolean): Promise<void> {
-  if (resolveCompanion()) return;
-  if (!canDownload()) {
-    log('No companion found and this build has no download configured; use bobPet.companionPath.');
+  if (!resolveCompanion()) {
+    log('No companion beside the extension; set bobPet.companionPath to one you installed yourself.');
     return;
   }
+  // Already connected: there is nothing left to ask about.
+  if ((await installedPetHooks(HOOK_TARGETS[0])).length > 0) return;
   if (!asked && context.globalState.get<boolean>(DECLINED)) return;
 
-  const size = COMPANION_RELEASE.bytes ? `${Math.round(COMPANION_RELEASE.bytes / 1e6)}MB` : 'about 100MB';
   const choice = await vscode.window.showInformationMessage(
     'Set up Bob Pet?',
     {
       modal: true,
       detail:
-        `This downloads the pet (${size}, once) and adds ${HOOK_EVENTS.length} hooks to ${HOOK_TARGETS[0].settings} ` +
-        'so it can react to what Bob is doing.\n\n' +
-        'The download is checked against a fingerprint built into this extension before it runs. The hooks print ' +
-        'nothing and always exit 0, so they cannot change or block anything Bob does. Uninstalling removes them.'
+        `The pet itself is installed with this extension. To react to what Bob is doing it needs ${HOOK_EVENTS.length} ` +
+        `hooks added to ${HOOK_TARGETS[0].settings}.
+
+` +
+        'The hooks print nothing and always exit 0, so they cannot change or block anything Bob does. Uninstalling ' +
+        'the extension removes them again.'
     },
     'Set up Bob Pet'
   );
@@ -460,30 +461,6 @@ async function setUp(context: vscode.ExtensionContext, asked: boolean): Promise<
     return;
   }
   await context.globalState.update(DECLINED, false);
-
-  try {
-    await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: 'Bob Pet', cancellable: false },
-      async (progress) => {
-        let last = 0;
-        await ensureDownloadedCompanion(
-          storageRoot,
-          (message, fraction) => {
-            const percent = fraction === undefined ? 0 : Math.round(fraction * 100);
-            progress.report({ message, increment: Math.max(0, percent - last) });
-            if (fraction !== undefined) last = percent;
-          },
-          log
-        );
-      }
-    );
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    log(`Companion download failed: ${reason}`);
-    const retry = await vscode.window.showErrorMessage(`Bob Pet could not be downloaded: ${reason}`, 'Try again');
-    if (retry === 'Try again') await setUp(context, true);
-    return;
-  }
 
   await connect({ ask: false });
   await start();
@@ -513,7 +490,7 @@ async function refreshHooks(): Promise<void> {
   }
 }
 
-let storageRoot = '';
+let extensionRoot = '';
 
 /**
  * The pet is a Windows application: it is focused, hooked and packaged with Windows-only
@@ -527,7 +504,7 @@ const COMMAND_IDS = ['bobPet.start', 'bobPet.stop', 'bobPet.focus', 'bobPet.setS
 export function activate(context: vscode.ExtensionContext): void {
   status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
   showStatus('Start Bob Pet', 'bobPet.start');
-  storageRoot = context.globalStorageUri.fsPath;
+  extensionRoot = context.extensionPath;
 
   if (process.platform !== 'win32') {
     log(`${WINDOWS_ONLY} (this is ${process.platform})`);

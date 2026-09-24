@@ -53,16 +53,10 @@ Until a project security mailbox is established, report vulnerabilities privatel
 
 ## How the companion is obtained
 
-The extension downloads the companion once, from this project's GitHub releases, and only
-after the user agrees to a prompt naming both the download and the hooks it will add.
+The companion ships inside the extension. Nothing is downloaded at install time or at any
+time afterwards, by either part: the extension makes no network calls, and neither does the
+pet. Installing needs no elevation and writes nothing outside the extension's own folder.
 
-- The SHA-256 of the published zip is compiled into the extension when that release is
-  built, so the fingerprint does not travel with the file it checks. A download that does
-  not match is deleted without being unpacked or run.
-- Only `https` is followed, through at most five redirects, and only to the URL built into
-  the extension.
-- It is unpacked into the extension's own storage folder with the user's own rights. No
-  installer runs, nothing is written outside that folder, and no elevation is requested.
-- Uninstalling the extension deletes it, along with the hooks in Bob's settings.
-- Nothing is downloaded when the user declines, when `bobPet.companionPath` already points
-  at a companion, or by the companion itself: it makes no network calls at all.
+A companion installed separately can be used instead by pointing `bobPet.companionPath` at
+it. That setting is machine-scoped, so a workspace cannot set it and no repository can
+choose what the extension starts.

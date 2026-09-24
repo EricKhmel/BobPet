@@ -1,8 +1,7 @@
-# Publishes a release: the companion as a zip, and the extension that downloads it.
+# Builds and publishes a release. The companion ships inside the extension, so there is
+# nothing to host and nothing for the extension to fetch at runtime.
 #
-# The extension is stamped with the zip's fingerprint before it is packaged, so it only
-# ever accepts the exact companion published alongside it. Tag a commit to release, e.g.
-# `git tag v0.1.1 && git push origin v0.1.1`.
+# Tag a commit to release, e.g. `git tag v0.1.2 && git push origin v0.1.2`.
 name: Release
 
 on:
@@ -25,18 +24,10 @@ jobs:
       - run: npm ci
       - run: npm test
 
-      - name: Build the companion as a zip
-        run: npm run package:zip --workspace=@bob-pet/companion
+      - name: Build the companion
+        run: npm run package --workspace=@bob-pet/companion
 
-      - name: Point the extension at this release
-        shell: bash
-        run: |
-          zip=$(ls dist/bob-pet-companion-*-win-x64.zip)
-          echo "ZIP=$zip" >> "$GITHUB_ENV"
-          node scripts/stamp-release.mjs "$zip" \
-            "https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/$(basename "$zip")"
-
-      - name: Package the extension
+      - name: Package the extension with the companion inside it
         run: npm run package --workspace=bob-pet
 
       # Named from what was built, so a version bump needs no edit here.
@@ -56,14 +47,9 @@ jobs:
         # the token on the command line, where anything on the runner can read it.
         run: npx --yes ovsx publish $env:VSIX
 
-      - name: Publish the release
+      - name: Keep the build with the tag
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            ${{ env.ZIP }}
             ${{ env.VSIX }}
             dist/SHA256SUMS.txt
-          body: |
-            Install the extension from the `.vsix` below. It downloads the companion
-            zip published here on first run and checks it against a fingerprint built into
-            the extension, so there is nothing else to install.

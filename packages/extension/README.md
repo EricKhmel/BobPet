@@ -2,8 +2,6 @@
 
 A pixel-art desktop pet that acts out what IBM Bob is doing.
 
-![Bob Pet reacting as Bob thinks, runs a command, reads a file and finishes](https://raw.githubusercontent.com/EricKhmel/BobPet/main/docs/media/bobpet.gif)
-
 It hammers while Bob runs commands, reads at a laptop while Bob searches your code, thinks
 between steps, and throws confetti when Bob finishes. It tells you what Bob is on — "Running
 npm test", "Editing index.ts" — and, when Bob is waiting for you to approve something, it
@@ -13,18 +11,15 @@ says so. Click it to bring Bob back to the front.
 
 ## Installing
 
-Install the extension and answer **Set up Bob Pet**. That single answer covers the two
-things it needs your permission for:
+Install the extension and answer **Set up Bob Pet**. The pet itself comes with the
+extension — nothing is downloaded and nothing is installed system-wide, so no administrator
+rights are needed.
 
-1. **Downloading the pet itself** — about 110MB, once. It comes from this project's GitHub
-   releases and is checked against a fingerprint built into the extension before it runs; a
-   file that does not match is discarded. It lands in the extension's own storage folder, so
-   nothing is installed system-wide and no administrator rights are needed.
-2. **Hooks in Bob's settings** (`~/.bob/settings/settings.json`) — this is how the pet learns
-   what Bob is doing. The hooks print nothing and always exit 0, so they cannot change or
-   block anything Bob does.
+The one thing it asks permission for is **hooks in Bob's settings**
+(`~/.bob/settings/settings.json`), which is how the pet learns what Bob is doing. They print
+nothing and always exit 0, so they cannot change or block anything Bob does.
 
-Decline and nothing is touched. Uninstalling the extension removes both again.
+Decline and nothing is touched. Uninstalling the extension removes the hooks again.
 
 ## While it is running
 
@@ -42,7 +37,8 @@ Decline and nothing is touched. Uninstalling the extension removes both again.
   secret generated fresh each time the pet starts.
 - The pet reads one thing from Bob: its record of approvals it is waiting on, so it can tell
   you when Bob needs you. It is read-only and nothing else in Bob is touched.
-- The one time anything is downloaded is the companion itself, as described above.
+- Nothing is ever downloaded: the pet ships inside the extension and neither part makes any
+  network call at all.
 
 ## Commands
 
@@ -59,7 +55,7 @@ Decline and nothing is touched. Uninstalling the extension removes both again.
 | Setting | Default | What it is for |
 | --- | --- | --- |
 | `bobPet.autoStart` | `true` | Start the pet when Bob opens |
-| `bobPet.companionPath` | empty | Use a companion you installed yourself instead of the downloaded one |
+| `bobPet.companionPath` | empty | Use a companion you installed yourself instead of the bundled one |
 | `bobPet.ipcPort` | `48173` | The loopback port to ask for; if it is taken, the pet takes a free one |
 
 ## Not an IBM product
@@ -67,5 +63,3 @@ Decline and nothing is touched. Uninstalling the extension removes both again.
 Bob Pet is an independent side project. It is not affiliated with, endorsed by, or supported
 by IBM, and compatibility with any particular build of IBM Bob is not guaranteed. It never
 modifies IBM Bob's files: it uses Bob's own documented hooks and nothing else.
-
-Source, issues and releases: https://github.com/EricKhmel/BobPet

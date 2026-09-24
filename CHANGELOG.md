@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Changed
+
+- The pet ships inside the extension instead of being downloaded. Installing the extension
+  is still all anyone has to do, and now nothing is fetched at install time or ever after:
+  neither part makes a network call. The extension is about 143MB as a result, and the
+  first-run prompt asks only about Bob's hooks, since the pet is already there. The
+  download, its fingerprint check and the release stamping are gone, and with them the
+  exception in AGENTS.md that allowed a runtime download at all.
+
 ### Security
 
 - A repository can no longer decide what the extension runs. `bobPet.companionPath` and
