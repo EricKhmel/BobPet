@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.3 — 2026-09-24
+
+### Changed
+
+- The listing carries the recording again, links to the repository and its issues, and says
+  what happens once setup is accepted: the pet appears by itself, starts with Bob after
+  that, and right-clicking it is where its state, size, pause and quit live.
+
 ## 0.1.2 — 2026-09-24
 
 The pet ships inside the extension, and the security pass below landed before anything was published.
