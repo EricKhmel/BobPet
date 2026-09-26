@@ -1,10 +1,18 @@
 {
   "name": "bob-pet",
   "displayName": "Bob Pet",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "bob-pet-erickhmel",
-  "description": "A pixel-art desktop pet that reacts to what IBM Bob is doing. Windows only for now; macOS and Linux are not supported yet. Not affiliated with IBM.",
+  "description": "A pixel-art desktop pet that acts out what IBM Bob is doing. It starts with Bob, and you can right-click it for its size, state and pause. Windows only for now; macOS and Linux are not supported yet. Not affiliated with IBM.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/EricKhmel/BobPet.git"
+  },
+  "homepage": "https://github.com/EricKhmel/BobPet#readme",
+  "bugs": {
+    "url": "https://github.com/EricKhmel/BobPet/issues"
+  },
   "private": true,
   "engines": {
     "vscode": "^1.102.0"
@@ -81,10 +89,10 @@
     "vscode:uninstall": "node ./dist/uninstall.js",
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --test dist/**/*.test.js",
-    "package": "npm run build && node ../../scripts/bundle-companion.mjs && vsce package --target win32-x64 --out ../../dist/bob-pet-0.1.4.vsix"
+    "package": "npm run build && node ../../scripts/bundle-companion.mjs && vsce package --target win32-x64 --out ../../dist/bob-pet-0.1.5.vsix"
   },
   "dependencies": {
-    "@bob-pet/shared": "0.1.4"
+    "@bob-pet/shared": "0.1.5"
   },
   "devDependencies": {
     "@types/node": "24.5.2",

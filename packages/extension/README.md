@@ -2,6 +2,8 @@
 
 A pixel-art desktop pet that acts out what IBM Bob is doing.
 
+![Bob Pet reacting as Bob thinks, runs a command, reads a file and finishes](https://raw.githubusercontent.com/EricKhmel/BobPet/main/docs/media/bobpet.gif)
+
 It hammers while Bob runs commands, reads at a laptop while Bob searches your code, thinks
 between steps, and throws confetti when Bob finishes. It tells you what Bob is on — "Running
 npm test", "Editing index.ts" — and, when Bob is waiting for you to approve something, it
@@ -19,12 +21,16 @@ The one thing it asks permission for is **hooks in Bob's settings**
 (`~/.bob/settings/settings.json`), which is how the pet learns what Bob is doing. They print
 nothing and always exit 0, so they cannot change or block anything Bob does.
 
+The pet then appears on its own, dropping in from the top of the screen, and starts with Bob
+every time after that. Turn that off with `bobPet.autoStart`.
+
 Decline and nothing is touched. Uninstalling the extension removes the hooks again.
 
 ## While it is running
 
 - **Drag** the pet anywhere; it remembers where you left it.
-- **Right-click** for its state, size (five, from 48px to 192px), pause and quit.
+- **Right-click the pet** for everything it can do: its state, its size (five, from 48px to
+  192px), pausing its animation, and quitting it.
 - **Click** it to bring IBM Bob to the front.
 - The speech bubble shows the step Bob is on, with a timer once a step runs long, and a
   summary when Bob finishes: "All done in 4m 12s: 12 steps, 3 files changed, 2 commands run".
@@ -63,3 +69,5 @@ Decline and nothing is touched. Uninstalling the extension removes the hooks aga
 Bob Pet is an independent side project. It is not affiliated with, endorsed by, or supported
 by IBM, and compatibility with any particular build of IBM Bob is not guaranteed. It never
 modifies IBM Bob's files: it uses Bob's own documented hooks and nothing else.
+
+Source and issues: https://github.com/EricKhmel/BobPet

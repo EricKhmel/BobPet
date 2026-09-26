@@ -1,6 +1,6 @@
 {
   "name": "@bob-pet/shared",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "type": "module",
   "private": true,
   "main": "./dist/index.js",

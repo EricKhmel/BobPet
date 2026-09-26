@@ -57,14 +57,44 @@ export type HookGroup = { matcher?: string; hooks: HookEntry[] };
  */
 export const HOOK_MARKER = 'BOB_PET_HOOK';
 export const HOOK_TIMEOUT_S = 5;
-export function hookCommand(target: { exe: string; hookScript: string }): string {
+/** The launcher's name carries the marker, so the pet still recognises its own hooks. */
+export const HOOK_LAUNCHER = 'BOB_PET_HOOK.cmd';
+
+/** Where the launcher lives: beside the pet's own settings, not inside the extension. */
+export const hookLauncherPath = (): string => join(process.env.APPDATA ?? homedir(), 'Bob Pet', HOOK_LAUNCHER);
+
+/**
+ * Writes the launcher Bob runs, and returns the command that runs it.
+ *
+ * Everything the hook needs - the environment, the executable, the script, the
+ * redirections - lives inside this file, so what goes into Bob's settings is one short
+ * quoted path. IBM Bob 2.2 would not launch the long chained command line the pet used
+ * before: short commands ran, ours never started at all, not even a marker placed ahead
+ * of it. Keeping the command short also means Bob's settings stop naming a path inside
+ * the extension, so an update no longer leaves a stale hook behind.
+ */
+export async function writeHookLauncher(target: { exe: string; hookScript: string }): Promise<string> {
+  const launcher = hookLauncherPath();
   const errorLog = join(process.env.APPDATA ?? homedir(), 'Bob Pet', 'hook-last-error.log');
-  return [
+  const script = [
+    '@echo off',
+    'rem Written by the Bob Pet extension. Runs one IBM Bob hook event.',
     `set "${HOOK_MARKER}=1"`,
     'set "ELECTRON_RUN_AS_NODE=1"',
     'set "ELECTRON_NO_ASAR="',
-    `"${target.exe}" "${target.hookScript}" 1>nul 2>"${errorLog}"`
-  ].join(' & ');
+    // stdout goes to nul: whatever a hook prints is injected into Bob's model context.
+    `"${target.exe}" "${target.hookScript}" 1>nul 2>"${errorLog}"`,
+    'exit /b 0',
+    ''
+  ].join('\r\n');
+  await mkdir(dirname(launcher), { recursive: true });
+  await writeFile(launcher, script, 'utf8');
+  return launcher;
+}
+
+/** What Bob runs: just the launcher, quoted. */
+export function hookCommand(_target: { exe: string; hookScript: string }): string {
+  return `"${hookLauncherPath()}"`;
 }
 
 /**
@@ -95,7 +125,9 @@ export async function readAgentSettings(path: string): Promise<AgentSettings> {
   }
 }
 
-export const isOurs = (entry: HookEntry): boolean => entry.command.includes(HOOK_MARKER);
+/** Ours if it runs our launcher, or is an older inline command carrying the marker. */
+export const isOurs = (entry: HookEntry): boolean =>
+  entry.command.includes(HOOK_MARKER) || entry.command.includes(HOOK_LAUNCHER);
 
 /** Returns the hooks block with our entries removed, leaving anyone else's intact. */
 export function withoutPetHooks(hooks: Record<string, HookGroup[]>): Record<string, HookGroup[]> {

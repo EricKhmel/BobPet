@@ -1,6 +1,6 @@
 {
   "name": "@bob-pet/companion",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Bob Pet desktop companion",
   "author": "Bob Pet Community",
   "private": true,
@@ -50,7 +50,7 @@
     ]
   },
   "dependencies": {
-    "@bob-pet/shared": "0.1.4",
+    "@bob-pet/shared": "0.1.5",
     "react": "19.1.1",
     "react-dom": "19.1.1"
   },

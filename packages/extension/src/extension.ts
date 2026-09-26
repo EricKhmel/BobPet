@@ -7,7 +7,7 @@ import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { exec, spawn, type ChildProcess } from 'node:child_process';
 import { type PetState } from '@bob-pet/shared';
-import { HOOK_EVENTS, HOOK_TARGETS, HOOK_TIMEOUT_S, applyHooks, hookCommand, installedPetHooks, type HookEntry } from './hooks.js';
+import { HOOK_EVENTS, HOOK_TARGETS, HOOK_TIMEOUT_S, applyHooks, hookCommand, installedPetHooks, writeHookLauncher, type HookEntry } from './hooks.js';
 import { COMPANION_EXE } from './install.js';
 
 let companion: ChildProcess | undefined;
@@ -360,6 +360,7 @@ async function connect(options: { ask?: boolean } = {}): Promise<void> {
     return;
   }
 
+  await writeHookLauncher(companion);
   const command = hookCommand(companion);
   // Kept short on purpose: the full command runs to several hundred characters, and a
   // long detail grows the modal until its buttons are pushed off a small screen. The
@@ -476,6 +477,9 @@ async function setUp(context: vscode.ExtensionContext, asked: boolean): Promise<
 async function refreshHooks(): Promise<void> {
   const companion = resolveCompanion();
   if (!companion) return;
+  // The launcher is rewritten every time, because the path inside it moves with each
+  // extension update even though the command in Bob's settings stays the same.
+  await writeHookLauncher(companion);
   const wanted = hookCommand(companion);
   for (const target of HOOK_TARGETS) {
     const existing = await installedPetHooks(target);

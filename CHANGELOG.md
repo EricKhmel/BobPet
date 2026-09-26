@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.1.5 — 2026-09-26
+
+### Fixed
+
+- The pet reacts to IBM Bob again. Bob 2.2 would not launch the long command the pet put
+  in Bob's settings: it logged "hook failed" for every event, which it does only when a
+  command never starts at all, so nothing the hook writes was ever touched and the pet
+  never heard about anything Bob did. The environment, the executable and the redirections
+  now live in a small launcher file beside the pet's own settings, and Bob's settings hold
+  only that short quoted path, which Bob runs without complaint. Confirmed working against
+  IBM Bob 1.126.0+bob2.2.0.
+- Because the command no longer names a folder inside the extension, an extension update
+  can no longer leave Bob pointing at a version that has been removed.
+
+## 0.1.3 — 2026-09-24
+
+### Changed
+
+- The listing carries the recording again, links to the repository and its issues, and says
+  what happens once setup is accepted: the pet appears by itself, starts with Bob after
+  that, and right-clicking it is where its state, size, pause and quit live.
+
 ## 0.1.2 — 2026-09-24
 
 The pet ships inside the extension, and the security pass below landed before anything was published.
