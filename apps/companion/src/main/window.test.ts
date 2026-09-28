@@ -299,11 +299,13 @@ test('only a recorded request earns "needs your OK"; time alone never does', () 
   assert.equal(stepLine(label, 200, 1), `Bob needs your OK — ${label}`);
 });
 
-test('the macOS adapter refuses politely until IBM Bob has been located', async () => {
+test('the macOS adapter finds IBM Bob by name, and refuses rather than claiming success', async () => {
   const adapter = new MacFocusAdapter();
+  // With nothing configured it still tries, because macOS can find an application by
+  // name. Here there is no macOS to ask, so it must refuse rather than claim success.
   const unset = await adapter.focusConfiguredApp({});
   assert.equal(unset.ok, false);
-  assert.match(unset.message, /settings/i, 'it should say how to fix it');
+  assert.match(unset.message, /IBM Bob/i, 'and say which application it means');
   adapter.dispose();
 
   // Whatever the platform, choosing an adapter always returns one that answers.

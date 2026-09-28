@@ -10,6 +10,8 @@
  * It mirrors Electron's own choice per platform, so the pet, the hook and the extension
  * all agree on one location.
  */
+import { posix, win32 } from 'node:path';
+
 export const PET_APP_NAME = 'Bob Pet';
 
 export function petDataDir(
@@ -19,9 +21,8 @@ export function petDataDir(
 ): string {
   const house = home || env.HOME || env.USERPROFILE || '';
   if (platform === 'win32') {
-    const roaming = env.APPDATA ?? `${house}\AppData\Roaming`;
-    return `${roaming}\${PET_APP_NAME}`;
+    return win32.join(env.APPDATA ?? win32.join(house, 'AppData', 'Roaming'), PET_APP_NAME);
   }
-  if (platform === 'darwin') return `${house}/Library/Application Support/${PET_APP_NAME}`;
-  return `${env.XDG_CONFIG_HOME || `${house}/.config`}/${PET_APP_NAME}`;
+  if (platform === 'darwin') return posix.join(house, 'Library', 'Application Support', PET_APP_NAME);
+  return posix.join(env.XDG_CONFIG_HOME || posix.join(house, '.config'), PET_APP_NAME);
 }

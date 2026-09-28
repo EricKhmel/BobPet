@@ -8,7 +8,7 @@
 import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { petDataDir } from './paths.js';
 import { homedir } from 'node:os';
-import { join, dirname } from 'node:path';
+import { join, dirname, posix } from 'node:path';
 
 // ---------------------------------------------------------------------------
 // IBM Bob hook integration
@@ -61,9 +61,19 @@ export const HOOK_TIMEOUT_S = 5;
 /** The launcher's name carries the marker, so the pet still recognises its own hooks. */
 export const HOOK_LAUNCHER = 'BOB_PET_HOOK.cmd';
 
-/** Where the launcher lives: beside the pet's own settings, not inside the extension. */
-export const hookLauncherPath = (platform: NodeJS.Platform = process.platform): string =>
-  join(petDataDir(platform), platform === 'win32' ? HOOK_LAUNCHER : HOOK_LAUNCHER.replace('.cmd', '.sh'));
+/**
+ * Where the launcher lives: beside the pet's own settings on Windows, where that path is
+ * proven to work, and in a folder with no spaces in its name elsewhere.
+ *
+ * macOS puts the pet's data under "Application Support/Bob Pet", so the command in Bob's
+ * settings would have to be quoted. IBM Bob will not launch that command - it reports the
+ * hook as failed without ever starting it - while the same command runs fine from a
+ * terminal. A path with no spaces needs no quoting, which removes the question.
+ */
+export const hookLauncherPath = (platform: NodeJS.Platform = process.platform, home = homedir()): string =>
+  platform === 'win32'
+    ? join(petDataDir(platform), HOOK_LAUNCHER)
+    : posix.join(home, '.bobpet', HOOK_LAUNCHER.replace('.cmd', '.sh'));
 
 /**
  * Writes the launcher Bob runs, and returns the command that runs it.
@@ -80,7 +90,10 @@ export async function writeHookLauncher(
   platform: NodeJS.Platform = process.platform
 ): Promise<string> {
   const launcher = hookLauncherPath(platform);
-  const errorLog = join(petDataDir(platform), 'hook-last-error.log');
+  // Kept beside the launcher so nothing in the command needs quoting either.
+  const errorLog = platform === 'win32'
+    ? join(petDataDir(platform), 'hook-last-error.log')
+    : posix.join(homedir(), '.bobpet', 'hook-last-error.log');
   // stdout is discarded on both: whatever a hook prints lands in Bob's model context.
   const script = platform === 'win32'
     ? [
@@ -112,7 +125,8 @@ export async function writeHookLauncher(
 
 /** What Bob runs: just the launcher, quoted. */
 export function hookCommand(_target: { exe: string; hookScript: string }): string {
-  return `"${hookLauncherPath()}"`;
+  const launcher = hookLauncherPath();
+  return launcher.includes(' ') ? `"${launcher}"` : launcher;
 }
 
 /**
