@@ -51,23 +51,23 @@ note(mode !== 0, 'the binary survived with its executable bit', `mode ${mode.toS
 const hookScript = join(petHome, 'Bob Pet.app', 'Contents', 'Resources', 'app.asar', 'dist', 'main', 'hook.js');
 note(await exists(join(petHome, 'Bob Pet.app', 'Contents', 'Resources', 'app.asar')), 'the hook script ships inside the bundle');
 
-// 3. macOS must be willing to run it at all: unsigned code is refused outright on arm64.
+// 3. macOS must be willing to run it at all: unsigned code is refused outright on
+// Apple Silicon. Intel Macs will run unsigned builds, and this runner cannot judge a
+// bundle for the other architecture, so the check applies to the native one only.
+const target = process.argv[3] ?? process.arch;
+const runnable = target === process.arch;
+if (!runnable) console.log(`SKIP  launching and judging a ${target} build on a ${process.arch} runner`);
 const signature = await run('/usr/bin/codesign', ['-dv', join(petHome, 'Bob Pet.app')]).then(
   () => 'signed',
   (error) => (String(error.stderr ?? error).includes('not signed') ? 'unsigned' : 'unknown')
 );
-// Only enforced for the architecture this runner can actually check.
-if (process.arch === 'arm64') {
+if (runnable && process.arch === 'arm64') {
   note(signature !== 'unsigned', `the bundle carries a signature (${signature})`, signature === 'unsigned' ? 'macOS refuses unsigned apps on Apple Silicon' : '');
+} else {
+  console.log(`INFO  ${target} bundle signature: ${signature}`);
 }
 
 // 4. The pet starts and answers on its loopback connection, as the extension expects.
-const target = process.argv[3] ?? process.arch;
-// A build for the other architecture cannot be launched here without Rosetta, so the
-// running checks are skipped rather than reported as product failures.
-const runnable = target === process.arch;
-if (!runnable) console.log(`SKIP  launching a ${target} build on a ${process.arch} runner`);
-
 const pet = runnable
   ? spawn(binary, [], { env: { ...process.env, BOB_PET_IPC_SECRET: SECRET, BOB_PET_IPC_PORT: String(PORT) }, stdio: ['ignore', 'pipe', 'pipe'] })
   : undefined;
