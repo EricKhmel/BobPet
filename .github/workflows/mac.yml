@@ -15,6 +15,7 @@ jobs:
   build:
     runs-on: macos-latest
     strategy:
+      fail-fast: false
       matrix:
         arch: [arm64, x64]
     steps:
@@ -27,28 +28,50 @@ jobs:
       - run: npm ci
 
       # A run's logs and summary both need a sign-in to read, but annotations do not, so
-      # a failure is republished as one and can be read from the run page or the API.
+      # a failure is republished as one. Newlines become ~ to keep it to a single line.
       - name: Tests
         shell: bash
         run: |
           set +e
-          npm test 2>&1 | tee test-output.txt
-          code=${PIPESTATUS[0]}
+          npm test > test-output.txt 2>&1
+          code=$?
+          cat test-output.txt
           if [ "$code" -ne 0 ]; then
-            detail=$(grep -vE '^\s*$' test-output.txt | tail -25 | sed 's/%/%25/g; s// /g' | awk '{printf "%s%%0A", $0}')
-            echo "::error title=macOS tests failed::$detail"
+            detail=$(tail -30 test-output.txt | sed 's/%/%25/g' | tr '\n' '~')
+            echo "::error title=macOS tests failed::${detail}"
           fi
           exit $code
 
       - name: Build the pet for macOS
-        run: npm run build --workspace=@bob-pet/companion && npx electron-builder --mac dir --${{ matrix.arch }} --publish never --project apps/companion
+        shell: bash
+        run: |
+          set +e
+          npm run build --workspace=@bob-pet/companion
+          npx electron-builder --mac dir --${{ matrix.arch }} --publish never --project apps/companion > build-output.txt 2>&1
+          code=$?
+          cat build-output.txt
+          if [ "$code" -ne 0 ]; then
+            detail=$(tail -30 build-output.txt | sed 's/%/%25/g' | tr '\n' '~')
+            echo "::error title=macOS pet build failed::${detail}"
+          fi
+          exit $code
 
       - name: Put the pet inside the extension
         run: node scripts/bundle-companion.mjs darwin-${{ matrix.arch }}
 
       - name: Package the extension for darwin-${{ matrix.arch }}
-        run: npx vsce package --target darwin-${{ matrix.arch }} --out dist/bob-pet-darwin-${{ matrix.arch }}.vsix
+        shell: bash
         working-directory: packages/extension
+        run: |
+          set +e
+          npx vsce package --target darwin-${{ matrix.arch }} --out ../../dist/bob-pet-darwin-${{ matrix.arch }}.vsix > package-output.txt 2>&1
+          code=$?
+          cat package-output.txt
+          if [ "$code" -ne 0 ]; then
+            detail=$(tail -30 package-output.txt | sed 's/%/%25/g' | tr '\n' '~')
+            echo "::error title=packaging failed::${detail}"
+          fi
+          exit $code
 
       - uses: actions/upload-artifact@v4
         with:
