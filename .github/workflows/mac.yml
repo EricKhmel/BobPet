@@ -73,6 +73,11 @@ jobs:
           fi
           exit $code
 
+      # Starts the packaged pet and delivers a hook event to it, the way Bob would.
+      - name: Smoke test the packaged extension
+        shell: bash
+        run: node scripts/smoke-mac.mjs dist/bob-pet-darwin-${{ matrix.arch }}.vsix
+
       - uses: actions/upload-artifact@v4
         with:
           name: bob-pet-darwin-${{ matrix.arch }}
