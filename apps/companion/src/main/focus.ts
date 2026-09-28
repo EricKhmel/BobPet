@@ -1,10 +1,17 @@
 import { basename, extname } from 'node:path';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 
+import { MacFocusAdapter } from './focus-mac.js';
+import { UnsupportedFocusAdapter } from './focus-none.js';
+
 export type FocusResult = { ok: boolean; message: string };
 export type FocusTarget = { path?: string; excludePids?: number[]; excludeWindowHandle?: bigint };
 export interface FocusAdapter {
   focusConfiguredApp(target?: FocusTarget): Promise<FocusResult>;
+  /** Pays any one-off start-up cost before the first click, where a platform has one. */
+  warmUp(): void;
+  /** Releases anything long-lived the adapter holds. */
+  dispose(): void;
 }
 
 const TAB = '\t';
@@ -288,4 +295,14 @@ export class WindowsFocusAdapter implements FocusAdapter {
     this.host = undefined;
     this.ready = undefined;
   }
+}
+
+/**
+ * The adapter for the platform the pet is running on. Each one uses that system's own
+ * documented way of activating an application, and none of them simulate input.
+ */
+export function createFocusAdapter(platform: NodeJS.Platform = process.platform): FocusAdapter {
+  if (platform === 'win32') return new WindowsFocusAdapter();
+  if (platform === 'darwin') return new MacFocusAdapter();
+  return new UnsupportedFocusAdapter();
 }

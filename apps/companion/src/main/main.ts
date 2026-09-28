@@ -4,7 +4,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, screen } from 
 import { randomBytes } from 'node:crypto';
 import { PET_SCALES, countStep, dragOutcome, dropDuration, dropIn, migrateSettings, startTally, wrapUp, type PetScaleName, type PetState, type TaskTally } from '@bob-pet/shared';
 import { LocalPetServer } from './ipc-server.js';
-import { WindowsFocusAdapter } from './focus.js';
+import { createFocusAdapter } from './focus.js';
 import { SettingsStore } from './settings.js';
 import { createPetWindow, petSize, safePetPosition } from './window.js';
 import { removeSessionFile, writeSessionFile } from './session-file.js';
@@ -20,7 +20,7 @@ let store: SettingsStore;
 let state: PetState = 'IDLE';
 let server: LocalPetServer | undefined;
 let sessionSecret: string | undefined;
-const focusAdapter = new WindowsFocusAdapter();
+const focusAdapter = createFocusAdapter();
 const argument = (name: string): string | undefined => {
   for (let i = 0; i < process.argv.length; i++) {
     const arg = process.argv[i];

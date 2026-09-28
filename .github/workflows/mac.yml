@@ -1,0 +1,43 @@
+# Builds the macOS packages on Apple hardware, which is the only place a .app can be
+# produced correctly. Nothing is published: the packages are attached to the run so they
+# can be installed by hand and tested before any release.
+name: macOS build
+
+on:
+  push:
+    branches: [platforms]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [arm64, x64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Build the pet for macOS
+        run: npm run build --workspace=@bob-pet/companion && npx electron-builder --mac dir --${{ matrix.arch }} --publish never --project apps/companion
+
+      - name: Put the pet inside the extension
+        run: node scripts/bundle-companion.mjs darwin-${{ matrix.arch }}
+
+      - name: Package the extension for darwin-${{ matrix.arch }}
+        run: npx vsce package --target darwin-${{ matrix.arch }} --out dist/bob-pet-darwin-${{ matrix.arch }}.vsix
+        working-directory: packages/extension
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bob-pet-darwin-${{ matrix.arch }}
+          path: dist/bob-pet-darwin-${{ matrix.arch }}.vsix

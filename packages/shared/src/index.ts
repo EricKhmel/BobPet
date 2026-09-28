@@ -137,3 +137,25 @@ export function stateForHook(payload: unknown): PetState | undefined {
 export { describeHook, describeTool } from './describe.js';
 export { STILL_RUNNING_MS, formatElapsed, startTally, countStep, wrapUp, type TaskTally } from './summary.js';
 export { dropDuration, dropIn, type Drop } from './entrance.js';
+
+/**
+ * Where the pet keeps its settings and the session file the hooks read.
+ *
+ * Electron hands the app this path, but two things that need it cannot ask Electron: the
+ * hook, which runs as bare node, and the extension, which is not Electron at all. This
+ * mirrors Electron's own choice per platform, so all three agree.
+ */
+export function petDataDir(
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+  home = ''
+): string {
+  const house = home || env.HOME || env.USERPROFILE || '';
+  const roaming = env.APPDATA ?? `${house}\\AppData\\Roaming`;
+  if (platform === 'win32') return `${roaming}\\${PET_APP_NAME}`;
+  if (platform === 'darwin') return `${house}/Library/Application Support/${PET_APP_NAME}`;
+  return `${env.XDG_CONFIG_HOME || `${house}/.config`}/${PET_APP_NAME}`;
+}
+
+/** The application's name, which is also the folder its data lives in. */
+export const PET_APP_NAME = 'Bob Pet';

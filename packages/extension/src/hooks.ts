@@ -5,7 +5,8 @@
  * node with no VS Code API around it, removes the hooks with exactly the same code that
  * installed them.
  */
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { petDataDir } from '@bob-pet/shared';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 
@@ -61,7 +62,8 @@ export const HOOK_TIMEOUT_S = 5;
 export const HOOK_LAUNCHER = 'BOB_PET_HOOK.cmd';
 
 /** Where the launcher lives: beside the pet's own settings, not inside the extension. */
-export const hookLauncherPath = (): string => join(process.env.APPDATA ?? homedir(), 'Bob Pet', HOOK_LAUNCHER);
+export const hookLauncherPath = (platform: NodeJS.Platform = process.platform): string =>
+  join(petDataDir(platform), platform === 'win32' ? HOOK_LAUNCHER : HOOK_LAUNCHER.replace('.cmd', '.sh'));
 
 /**
  * Writes the launcher Bob runs, and returns the command that runs it.
@@ -73,22 +75,38 @@ export const hookLauncherPath = (): string => join(process.env.APPDATA ?? homedi
  * of it. Keeping the command short also means Bob's settings stop naming a path inside
  * the extension, so an update no longer leaves a stale hook behind.
  */
-export async function writeHookLauncher(target: { exe: string; hookScript: string }): Promise<string> {
-  const launcher = hookLauncherPath();
-  const errorLog = join(process.env.APPDATA ?? homedir(), 'Bob Pet', 'hook-last-error.log');
-  const script = [
-    '@echo off',
-    'rem Written by the Bob Pet extension. Runs one IBM Bob hook event.',
-    `set "${HOOK_MARKER}=1"`,
-    'set "ELECTRON_RUN_AS_NODE=1"',
-    'set "ELECTRON_NO_ASAR="',
-    // stdout goes to nul: whatever a hook prints is injected into Bob's model context.
-    `"${target.exe}" "${target.hookScript}" 1>nul 2>"${errorLog}"`,
-    'exit /b 0',
-    ''
-  ].join('\r\n');
+export async function writeHookLauncher(
+  target: { exe: string; hookScript: string },
+  platform: NodeJS.Platform = process.platform
+): Promise<string> {
+  const launcher = hookLauncherPath(platform);
+  const errorLog = join(petDataDir(platform), 'hook-last-error.log');
+  // stdout is discarded on both: whatever a hook prints lands in Bob's model context.
+  const script = platform === 'win32'
+    ? [
+        '@echo off',
+        'rem Written by the Bob Pet extension. Runs one IBM Bob hook event.',
+        `set "${HOOK_MARKER}=1"`,
+        'set "ELECTRON_RUN_AS_NODE=1"',
+        'set "ELECTRON_NO_ASAR="',
+        `"${target.exe}" "${target.hookScript}" 1>nul 2>"${errorLog}"`,
+        'exit /b 0',
+        ''
+      ].join('\r\n')
+    : [
+        '#!/bin/sh',
+        '# Written by the Bob Pet extension. Runs one IBM Bob hook event.',
+        `export ${HOOK_MARKER}=1`,
+        'export ELECTRON_RUN_AS_NODE=1',
+        'unset ELECTRON_NO_ASAR',
+        `"${target.exe}" "${target.hookScript}" >/dev/null 2>"${errorLog}"`,
+        'exit 0',
+        ''
+      ].join('\n');
   await mkdir(dirname(launcher), { recursive: true });
   await writeFile(launcher, script, 'utf8');
+  // A shell script Bob cannot execute is no better than no hook at all.
+  if (platform !== 'win32') await chmod(launcher, 0o755);
   return launcher;
 }
 

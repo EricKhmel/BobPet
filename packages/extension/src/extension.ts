@@ -6,9 +6,9 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { exec, spawn, type ChildProcess } from 'node:child_process';
-import { type PetState } from '@bob-pet/shared';
+import { petDataDir, type PetState } from '@bob-pet/shared';
 import { HOOK_EVENTS, HOOK_TARGETS, HOOK_TIMEOUT_S, applyHooks, hookCommand, installedPetHooks, writeHookLauncher, type HookEntry } from './hooks.js';
-import { COMPANION_EXE } from './install.js';
+import { ensureCompanion } from './install.js';
 
 let companion: ChildProcess | undefined;
 let secret: string | undefined;
@@ -96,10 +96,8 @@ function setupPersistentListener(targetPort: number, targetSecret: string): void
  * handshake still has to succeed with the secret this window generated.
  */
 async function publishedPort(): Promise<number | undefined> {
-  const appData = process.env.APPDATA;
-  if (!appData) return undefined;
   try {
-    const raw = JSON.parse(await readFile(join(appData, 'Bob Pet', 'session.json'), 'utf8')) as { port?: unknown };
+    const raw = JSON.parse(await readFile(join(petDataDir(), 'session.json'), 'utf8')) as { port?: unknown };
     return typeof raw.port === 'number' && raw.port > 0 && raw.port <= 65535 ? raw.port : undefined;
   } catch {
     return undefined;
@@ -299,7 +297,7 @@ function companionCandidates(): string[] {
   return [
     executable(),
     // The copy that ships inside this extension, which is how everyone will have it.
-    extensionRoot ? join(extensionRoot, 'companion', COMPANION_EXE) : '',
+    bundledCompanion ?? '',
     localApps ? join(localApps, 'Programs', 'bob-pet-companion', 'Bob Pet.exe') : '',
     ...development
   ].filter((candidate): candidate is string => Boolean(candidate));
@@ -325,8 +323,12 @@ function resolveCompanion(): { exe: string; hookScript: string } | undefined {
       }
       continue;
     }
-    // Installed build: the hook is packed in the asar next to the executable.
-    return { exe, hookScript: join(dirname(exe), 'resources', 'app.asar', 'dist', 'main', 'hook.js') };
+    // Installed build: the hook is packed in the asar beside the executable. On macOS
+    // that is Contents/Resources, one level up from Contents/MacOS where the binary is.
+    const resources = process.platform === 'darwin'
+      ? join(dirname(dirname(exe)), 'Resources')
+      : join(dirname(exe), 'resources');
+    return { exe, hookScript: join(resources, 'app.asar', 'dist', 'main', 'hook.js') };
   }
   return undefined;
 }
@@ -495,6 +497,7 @@ async function refreshHooks(): Promise<void> {
 }
 
 let extensionRoot = '';
+let bundledCompanion: string | undefined;
 
 /**
  * The pet is a Windows application: it is focused, hooked and packaged with Windows-only
@@ -523,6 +526,13 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 
   void (async () => {
+    bundledCompanion = await ensureCompanion(
+      context.extensionPath,
+      context.globalStorageUri.fsPath,
+      String((context.extension.packageJSON as { version?: string }).version ?? 'unknown'),
+      log
+    );
+    if (!bundledCompanion) log('No pet found inside this extension for this platform.');
     await refreshHooks();
     await setUp(context, false);
     if (vscode.workspace.getConfiguration('bobPet').get<boolean>('autoStart', true) && resolveCompanion()) await start();

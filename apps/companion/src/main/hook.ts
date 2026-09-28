@@ -13,7 +13,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { Socket } from 'node:net';
-import { stateForHook, describeHook, type PetState } from '@bob-pet/shared';
+import { stateForHook, describeHook, type PetState, petDataDir } from '@bob-pet/shared';
 
 const DEADLINE_MS = 700;
 
@@ -38,7 +38,7 @@ function readStdin(): Promise<string> {
 
 /** Delivers one state update. Failures are silent: the pet is never worth a delay. */
 async function send(message: Record<string, unknown>): Promise<void> {
-  const userData = join(process.env.APPDATA ?? '', 'Bob Pet');
+  const userData = petDataDir();
   const raw = await readFile(join(userData, 'session.json'), 'utf8');
   const { port, secret } = JSON.parse(raw) as { port: number; secret: string };
   if (!Number.isInteger(port) || typeof secret !== 'string') return;

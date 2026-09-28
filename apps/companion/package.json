@@ -11,7 +11,8 @@
     "test": "npm run build && node --test dist/main/**/*.test.js",
     "package": "npm run build && electron-builder --win nsis --x64 --publish never",
     "lint": "tsc --noEmit -p tsconfig.main.json && tsc --noEmit -p tsconfig.preload.json",
-    "package:zip": "npm run build && electron-builder --win zip --x64 --publish never"
+    "package:zip": "npm run build && electron-builder --win zip --x64 --publish never",
+    "package:mac": "npm run build && electron-builder --mac dir --arm64 --x64 --publish never"
   },
   "build": {
     "appId": "com.bobpet.companion",
@@ -47,7 +48,20 @@
     "asar": true,
     "electronLanguages": [
       "en-US"
-    ]
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dir",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools",
+      "identity": null
+    }
   },
   "dependencies": {
     "@bob-pet/shared": "0.1.5",

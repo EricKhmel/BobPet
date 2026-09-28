@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PET_STATES, PET_SCALES, clampPosition, migrateSettings, parseMessage, defaultSettings, dragOutcome, stateForHook, describeHook, dropDuration, dropIn, startTally, countStep, wrapUp, formatElapsed } from './index.js';
+import { PET_STATES, PET_SCALES, clampPosition, migrateSettings, parseMessage, defaultSettings, dragOutcome, stateForHook, describeHook, dropDuration, dropIn, petDataDir, startTally, countStep, wrapUp, formatElapsed } from './index.js';
 
 test('protocol validation: accepts exact protocol messages and valid states', () => {
   for (const state of PET_STATES) {
@@ -237,4 +237,13 @@ test('a spoken line cannot carry invisible characters', () => {
   // Ordinary text is untouched apart from having its whitespace collapsed.
   const plain = parseMessage({ version: 1, type: 'set-state', state: 'WORKING', label: '  Running   npm test\n' });
   assert.equal((plain as { label?: string }).label, 'Running npm test');
+});
+
+test('the pet keeps its data where each platform expects it', () => {
+  const home = { HOME: '/Users/sam', USERPROFILE: 'C:\\Users\\sam', APPDATA: 'C:\\Users\\sam\\AppData\\Roaming' };
+  assert.equal(petDataDir('win32', home), 'C:\\Users\\sam\\AppData\\Roaming\\Bob Pet');
+  assert.equal(petDataDir('darwin', home, '/Users/sam'), '/Users/sam/Library/Application Support/Bob Pet');
+  assert.equal(petDataDir('linux', home, '/home/sam'), '/home/sam/.config/Bob Pet');
+  // A Linux user who moved their config directory is followed there.
+  assert.equal(petDataDir('linux', { ...home, XDG_CONFIG_HOME: '/home/sam/cfg' }, '/home/sam'), '/home/sam/cfg/Bob Pet');
 });
