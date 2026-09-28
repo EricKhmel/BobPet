@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { petSize } from './window.js';
-import { WindowsFocusAdapter, sanitizeProcessName } from './focus.js';
+import { MacFocusAdapter } from './focus-mac.js';
+import { createFocusAdapter, WindowsFocusAdapter, sanitizeProcessName } from './focus.js';
 import { LocalPetServer } from './ipc-server.js';
 import { Socket } from 'node:net';
 import { execFileSync, spawn } from 'node:child_process';
@@ -29,7 +30,9 @@ test('focus adapter fallback handles missing/invalid executable gracefully', asy
   try {
     const nonRunning = await adapter.focusConfiguredApp({ path: 'C:\\Bob\\non_existent_fake_process_12345.exe' });
     assert.equal(nonRunning.ok, false);
-    assert.match(nonRunning.message, /not found/i);
+    // On Windows it looked and found nothing. Anywhere else this adapter is not the one in
+    // use and declines outright, which is equally a refusal rather than a false yes.
+    assert.match(nonRunning.message, process.platform === 'win32' ? /not found/i : /windows only/i);
   } finally {
     adapter.dispose();
   }
@@ -294,4 +297,18 @@ test('only a recorded request earns "needs your OK"; time alone never does', () 
   assert.equal(stepLine(label, STILL_RUNNING_MS + 60_000, 0), `Still going — ${label}`);
   assert.equal(stepLine(label, STILL_RUNNING_MS + 60_000, undefined), `Still going — ${label}`, 'unreadable must not become a claim');
   assert.equal(stepLine(label, 200, 1), `Bob needs your OK — ${label}`);
+});
+
+test('the macOS adapter refuses politely until IBM Bob has been located', async () => {
+  const adapter = new MacFocusAdapter();
+  const unset = await adapter.focusConfiguredApp({});
+  assert.equal(unset.ok, false);
+  assert.match(unset.message, /settings/i, 'it should say how to fix it');
+  adapter.dispose();
+
+  // Whatever the platform, choosing an adapter always returns one that answers.
+  assert.ok(createFocusAdapter('win32'));
+  assert.ok(createFocusAdapter('darwin'));
+  const elsewhere = createFocusAdapter('linux');
+  assert.equal((await elsewhere.focusConfiguredApp({ path: '/anything' })).ok, false, 'and never claims success');
 });
