@@ -26,20 +26,18 @@ jobs:
 
       - run: npm ci
 
-      # The run's logs need a sign-in to read, so the failure is copied into the run
-      # summary, which anyone with the link can see.
+      # A run's logs and summary both need a sign-in to read, but annotations do not, so
+      # a failure is republished as one and can be read from the run page or the API.
       - name: Tests
         shell: bash
         run: |
           set +e
           npm test 2>&1 | tee test-output.txt
           code=${PIPESTATUS[0]}
-          {
-            echo '## Test output'
-            echo '```'
-            tail -80 test-output.txt
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$code" -ne 0 ]; then
+            detail=$(grep -vE '^\s*$' test-output.txt | tail -25 | sed 's/%/%25/g; s// /g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=macOS tests failed::$detail"
+          fi
           exit $code
 
       - name: Build the pet for macOS
