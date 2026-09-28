@@ -26,7 +26,7 @@ export class MacFocusAdapter implements FocusAdapter {
       return { ok: false, message: 'Set the IBM Bob application in Bob Pet settings to use click-to-focus.' };
     }
     return new Promise<FocusResult>((resolve) => {
-      execFile('/usr/bin/open', ['-a', path], { timeout: ACTIVATE_TIMEOUT_MS }, (error) => {
+      execFile('/usr/bin/open', ['-a', path, '--'], { timeout: ACTIVATE_TIMEOUT_MS }, (error) => {
         if (!error) return resolve({ ok: true, message: '' });
         // macOS says "Unable to find application named ..." when the path is wrong, which
         // is worth passing on; anything else is reported plainly rather than guessed at.

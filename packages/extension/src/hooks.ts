@@ -6,7 +6,7 @@
  * installed them.
  */
 import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { petDataDir } from '@bob-pet/shared';
+import { petDataDir } from './paths.js';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 

@@ -56,6 +56,16 @@ jobs:
           fi
           exit $code
 
+      # electron-builder rewrites the binary, which invalidates the signature Electron
+      # ships with. Apple Silicon kills an unsigned Mach-O outright, so it is re-signed
+      # ad-hoc here; that is enough to run, and needs no Apple account.
+      - name: Sign the bundle
+        shell: bash
+        run: |
+          app=$(ls -d dist/mac*/Bob\ Pet.app | head -1)
+          codesign --force --deep --sign - "$app"
+          codesign -dv "$app" 2>&1 | head -3
+
       - name: Put the pet inside the extension
         run: node scripts/bundle-companion.mjs darwin-${{ matrix.arch }}
 

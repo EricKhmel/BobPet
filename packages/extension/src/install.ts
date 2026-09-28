@@ -10,7 +10,7 @@
  * after that. Nothing is downloaded at any point.
  */
 import { execFile } from 'node:child_process';
-import { mkdir, rm, stat } from 'node:fs/promises';
+import { mkdir, readdir, rename, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -51,18 +51,44 @@ export async function ensureCompanion(
   if (!(await exists(archive))) return undefined;
 
   log(`Unpacking the pet for macOS into ${home}`);
-  await rm(home, { recursive: true, force: true });
-  await mkdir(home, { recursive: true });
-  await run('/usr/bin/tar', ['-xzf', archive, '-C', home]);
-  if (!(await exists(binary))) {
-    log(`Unpacked ${archive} but found no ${MAC_APP} inside it`);
-    return undefined;
+  // Extracted beside the destination and renamed into place: two editor windows activate
+  // at once, and extracting over a shared folder means one deletes the other's half-done
+  // tree. A rename is atomic, so the loser simply finds the winner's copy already there.
+  const staging = `${home}.${process.pid}.tmp`;
+  await rm(staging, { recursive: true, force: true });
+  await mkdir(staging, { recursive: true });
+  try {
+    await run('/usr/bin/tar', ['-xzf', archive, '-C', staging]);
+    if (!(await exists(macBinary(staging)))) {
+      log(`Unpacked ${archive} but found no ${MAC_APP} inside it`);
+      return undefined;
+    }
+    await mkdir(join(storage, 'companion'), { recursive: true });
+    await rename(staging, home).catch(async (error: NodeJS.ErrnoException) => {
+      // Someone else got there first, which is fine: their copy is as good as ours.
+      if (!(await exists(binary))) throw error;
+    });
+  } finally {
+    await rm(staging, { recursive: true, force: true });
   }
-  // Quarantine would make macOS refuse an app it thinks came from the internet. Ours came
-  // from the extension the user installed, and removing the flag is best effort only.
-  await run('/usr/bin/xattr', ['-dr', 'com.apple.quarantine', join(home, MAC_APP)]).catch(() => undefined);
+  if (!(await exists(binary))) return undefined;
   log(`The pet is ready at ${binary}`);
+  await removeOtherVersions(storage, version, log);
   return binary;
+}
+
+/** Clears out the copies left by earlier versions; each one is a few hundred megabytes. */
+async function removeOtherVersions(storage: string, keep: string, log: (line: string) => void): Promise<void> {
+  try {
+    const root = join(storage, 'companion');
+    for (const entry of await readdir(root)) {
+      if (entry === keep || entry.endsWith('.tmp')) continue;
+      await rm(join(root, entry), { recursive: true, force: true });
+      log(`Removed the copy left by version ${entry}`);
+    }
+  } catch {
+    // An old copy left behind costs disk space and nothing else.
+  }
 }
 
 const exists = (path: string): Promise<boolean> => stat(path).then(() => true, () => false);

@@ -6,7 +6,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { exec, spawn, type ChildProcess } from 'node:child_process';
-import { petDataDir, type PetState } from '@bob-pet/shared';
+import { type PetState } from '@bob-pet/shared';
+import { petDataDir } from './paths.js';
 import { HOOK_EVENTS, HOOK_TARGETS, HOOK_TIMEOUT_S, applyHooks, hookCommand, installedPetHooks, writeHookLauncher, type HookEntry } from './hooks.js';
 import { ensureCompanion } from './install.js';
 
@@ -505,7 +506,8 @@ let bundledCompanion: string | undefined;
  * offer it elsewhere, but one installed by hand says so plainly rather than failing in
  * the middle of a download.
  */
-const WINDOWS_ONLY = 'Bob Pet works on Windows only for now. Support for macOS and Linux is not ready yet.';
+const SUPPORTED: NodeJS.Platform[] = ['win32', 'darwin'];
+const UNSUPPORTED = 'Bob Pet works on Windows and macOS. Linux support is not ready yet.';
 const COMMAND_IDS = ['bobPet.start', 'bobPet.stop', 'bobPet.focus', 'bobPet.setState', 'bobPet.connect', 'bobPet.disconnect', 'bobPet.openSettings'];
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -513,29 +515,38 @@ export function activate(context: vscode.ExtensionContext): void {
   showStatus('Start Bob Pet', 'bobPet.start');
   extensionRoot = context.extensionPath;
 
-  if (process.platform !== 'win32') {
-    log(`${WINDOWS_ONLY} (this is ${process.platform})`);
-    showStatus('Bob Pet: Windows only');
-    void vscode.window.showWarningMessage(WINDOWS_ONLY);
+  if (!SUPPORTED.includes(process.platform)) {
+    log(`${UNSUPPORTED} (this is ${process.platform})`);
+    showStatus('Bob Pet: not on this platform');
+    void vscode.window.showWarningMessage(UNSUPPORTED);
     context.subscriptions.push(
       status,
       getLogger(),
-      ...COMMAND_IDS.map((id) => vscode.commands.registerCommand(id, () => vscode.window.showWarningMessage(WINDOWS_ONLY)))
+      ...COMMAND_IDS.map((id) => vscode.commands.registerCommand(id, () => vscode.window.showWarningMessage(UNSUPPORTED)))
     );
     return;
   }
 
   void (async () => {
-    bundledCompanion = await ensureCompanion(
-      context.extensionPath,
-      context.globalStorageUri.fsPath,
-      String((context.extension.packageJSON as { version?: string }).version ?? 'unknown'),
-      log
-    );
-    if (!bundledCompanion) log('No pet found inside this extension for this platform.');
-    await refreshHooks();
-    await setUp(context, false);
-    if (vscode.workspace.getConfiguration('bobPet').get<boolean>('autoStart', true) && resolveCompanion()) await start();
+    try {
+      bundledCompanion = await ensureCompanion(
+        context.extensionPath,
+        context.globalStorageUri.fsPath,
+        String((context.extension.packageJSON as { version?: string }).version ?? 'unknown'),
+        log
+      );
+      if (!bundledCompanion) log('No pet found inside this extension for this platform.');
+      await refreshHooks();
+      await setUp(context, false);
+      if (vscode.workspace.getConfiguration('bobPet').get<boolean>('autoStart', true) && resolveCompanion()) await start();
+    } catch (error) {
+      // Without this the whole start-up path dies silently: no hooks, no pet, and nothing
+      // in the output channel to say why, which is the worst way for this to fail.
+      const reason = error instanceof Error ? (error.stack ?? error.message) : String(error);
+      log(`Bob Pet could not start up: ${reason}`);
+      getLogger().show(true);
+      void vscode.window.showErrorMessage(`Bob Pet could not start up: ${error instanceof Error ? error.message : String(error)}`);
+    }
   })();
 
   context.subscriptions.push(

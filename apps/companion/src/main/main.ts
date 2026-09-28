@@ -14,6 +14,9 @@ import { bobDatabasePath, pendingApprovalsSince, stepLine } from './bob-approval
 // Must run before anything reads a user-data path: Electron derives userData from the
 // app name, which otherwise falls back to the package name (%APPDATA%\@bob-pet\companion).
 app.setName('Bob Pet');
+// A desktop pet belongs on the desktop, not in the Dock or the application switcher, and
+// an accessory application also keeps its menu bar off the top of the screen.
+if (process.platform === 'darwin') app.dock?.hide();
 
 let petWindow: BrowserWindow | undefined;
 let store: SettingsStore;
@@ -317,7 +320,9 @@ async function chooseBobExecutable(): Promise<void> {
     title: 'Select the IBM Bob executable',
     defaultPath: settings.bobExecutablePath,
     properties: ['openFile'],
-    filters: [{ name: 'Applications', extensions: ['exe'] }]
+    // A macOS application is a .app bundle; filtering for .exe would grey it out, leaving
+    // no way to configure click-to-focus at all.
+    filters: [process.platform === 'darwin' ? { name: 'Applications', extensions: ['app'] } : { name: 'Applications', extensions: ['exe'] }]
   });
   const [chosen] = picked.filePaths;
   if (picked.canceled || !chosen) return;
