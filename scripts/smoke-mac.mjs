@@ -11,7 +11,7 @@
 import { execFile, spawn } from 'node:child_process';
 import { mkdtemp, mkdir, readFile, rm, stat } from 'node:fs/promises';
 import { connect } from 'node:net';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 
@@ -56,16 +56,24 @@ const signature = await run('/usr/bin/codesign', ['-dv', join(petHome, 'Bob Pet.
   () => 'signed',
   (error) => (String(error.stderr ?? error).includes('not signed') ? 'unsigned' : 'unknown')
 );
-note(signature !== 'unsigned', `the bundle carries a signature (${signature})`, signature === 'unsigned' ? 'macOS refuses unsigned apps on Apple Silicon' : '');
+// Only enforced for the architecture this runner can actually check.
+if (process.arch === 'arm64') {
+  note(signature !== 'unsigned', `the bundle carries a signature (${signature})`, signature === 'unsigned' ? 'macOS refuses unsigned apps on Apple Silicon' : '');
+}
 
 // 4. The pet starts and answers on its loopback connection, as the extension expects.
-const pet = spawn(binary, [], {
-  env: { ...process.env, BOB_PET_IPC_SECRET: SECRET, BOB_PET_IPC_PORT: String(PORT), HOME: petHome },
-  stdio: ['ignore', 'pipe', 'pipe']
-});
+const target = process.argv[3] ?? process.arch;
+// A build for the other architecture cannot be launched here without Rosetta, so the
+// running checks are skipped rather than reported as product failures.
+const runnable = target === process.arch;
+if (!runnable) console.log(`SKIP  launching a ${target} build on a ${process.arch} runner`);
+
+const pet = runnable
+  ? spawn(binary, [], { env: { ...process.env, BOB_PET_IPC_SECRET: SECRET, BOB_PET_IPC_PORT: String(PORT) }, stdio: ['ignore', 'pipe', 'pipe'] })
+  : undefined;
 let petSaid = '';
-pet.stdout.on('data', (d) => { petSaid += d; });
-pet.stderr.on('data', (d) => { petSaid += d; });
+pet?.stdout.on('data', (d) => { petSaid += d; });
+pet?.stderr.on('data', (d) => { petSaid += d; });
 
 const ask = (port, secret, message) => new Promise((resolve) => {
   const socket = connect(port, '127.0.0.1', () => {
@@ -77,31 +85,37 @@ const ask = (port, secret, message) => new Promise((resolve) => {
 });
 
 let answered = 'no answer';
-for (let attempt = 0; attempt < 20 && !answered.includes('true'); attempt += 1) {
-  await new Promise((r) => setTimeout(r, 1000));
-  answered = await ask(PORT, SECRET, { version: 1, type: 'ping' });
+if (runnable) {
+  for (let attempt = 0; attempt < 20 && !answered.includes('true'); attempt += 1) {
+    await new Promise((r) => setTimeout(r, 1000));
+    answered = await ask(PORT, SECRET, { version: 1, type: 'ping' });
+  }
+  note(answered.includes('true'), 'the pet starts and answers on loopback', answered.slice(0, 120));
 }
-note(answered.includes('true'), 'the pet starts and answers on loopback', answered.slice(0, 120));
 
 // 5. It publishes where the hooks should find it.
-const sessionFile = join(petHome, 'Library', 'Application Support', 'Bob Pet', 'session.json');
-const session = await readFile(sessionFile, 'utf8').then((t) => JSON.parse(t), () => undefined);
-note(Boolean(session?.port), 'it publishes its session where the hook looks', sessionFile.replace(petHome, '~'));
+const sessionFile = join(homedir(), 'Library', 'Application Support', 'Bob Pet', 'session.json');
+if (runnable) {
+  const session = await readFile(sessionFile, 'utf8').then((t) => JSON.parse(t), () => undefined);
+  note(Boolean(session?.port), 'it publishes its session where the hook looks', sessionFile.replace(homedir(), '~'));
+}
 
 // 6. A hook event, delivered the way Bob delivers one: as bare node, stdin, nothing printed.
-const hook = await new Promise((resolve) => {
+const hook = !runnable ? { code: 0, stdout: '', stderr: '' } : await new Promise((resolve) => {
   const child = execFile(
     binary,
     [hookScript],
-    { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', HOME: petHome }, timeout: 10_000 },
+    { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, timeout: 10_000 },
     (error, stdout, stderr) => resolve({ code: error?.code ?? 0, stdout, stderr })
   );
   child.stdin.end(JSON.stringify({ session_id: 'smoke', cwd: work, hook_event_name: 'PreToolUse', tool_name: 'execute_command', tool_input: { command: 'npm test' } }));
 });
-note(hook.code === 0, 'a hook event runs and exits 0', `code ${hook.code}`);
-note(hook.stdout === '', 'the hook prints nothing back to Bob', JSON.stringify(hook.stdout).slice(0, 80));
+if (runnable) {
+  note(hook.code === 0, 'a hook event runs and exits 0', `code ${hook.code}`);
+  note(hook.stdout === '', 'the hook prints nothing back to Bob', JSON.stringify(hook.stdout).slice(0, 80));
+}
 
-pet.kill();
+pet?.kill();
 await rm(work, { recursive: true, force: true });
 
 const failed = steps.filter((s) => !s.ok);

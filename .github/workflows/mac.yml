@@ -76,7 +76,7 @@ jobs:
       # Starts the packaged pet and delivers a hook event to it, the way Bob would.
       - name: Smoke test the packaged extension
         shell: bash
-        run: node scripts/smoke-mac.mjs dist/bob-pet-darwin-${{ matrix.arch }}.vsix
+        run: node scripts/smoke-mac.mjs dist/bob-pet-darwin-${{ matrix.arch }}.vsix ${{ matrix.arch }}
 
       - uses: actions/upload-artifact@v4
         with:
