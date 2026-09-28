@@ -1,4 +1,4 @@
-import { basename, extname } from 'node:path';
+import { win32 } from 'node:path';
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 
 import { MacFocusAdapter } from './focus-mac.js';
@@ -175,8 +175,10 @@ while ($true) {
 
 /** `Get-Process -Name` accepts wildcards; keep only characters a real exe stem can contain. */
 export function sanitizeProcessName(path?: string): string {
-  if (!path || extname(path).toLowerCase() !== '.exe') return '';
-  return basename(path, '.exe').replace(/[^A-Za-z0-9 ._-]/g, '');
+  // Always parsed as a Windows path, whatever the host: elsewhere a backslash is an
+  // ordinary character, so `IBM Bob.exe` would come back as the whole path run together.
+  if (!path || win32.extname(path).toLowerCase() !== '.exe') return '';
+  return win32.basename(path, '.exe').replace(/[^A-Za-z0-9 ._-]/g, '');
 }
 
 export class WindowsFocusAdapter implements FocusAdapter {
