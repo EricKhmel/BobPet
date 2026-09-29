@@ -1,7 +1,11 @@
 # Builds and publishes a release. The companion ships inside the extension, so there is
 # nothing to host and nothing for the extension to fetch at runtime.
 #
-# Tag a commit to release, e.g. `git tag v0.1.2 && git push origin v0.1.2`.
+# One job per platform: each VSIX carries the pet built for that platform, and a macOS
+# .app can only be produced on Apple hardware. Open VSX takes one upload per target, so
+# a host installing the extension gets the build for the machine it is running on.
+#
+# Tag a commit to release, e.g. `git tag v0.2.0 && git push origin v0.2.0`.
 name: Release
 
 on:
@@ -12,7 +16,7 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,3 +57,56 @@ jobs:
           files: |
             ${{ env.VSIX }}
             dist/SHA256SUMS.txt
+
+  macos:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Build the pet for macOS
+        run: |
+          npm run build --workspace=@bob-pet/companion
+          npx electron-builder --mac dir --${{ matrix.arch }} --publish never --project apps/companion
+
+      # electron-builder rewrites the binary, which invalidates the signature Electron
+      # ships with. Apple Silicon kills an unsigned Mach-O outright, so it is re-signed
+      # ad-hoc here; that is enough to run, and needs no Apple account.
+      - name: Sign the bundle
+        run: |
+          app=$(ls -d dist/mac*/Bob\ Pet.app | head -1)
+          codesign --force --deep --sign - "$app"
+          codesign -dv "$app" 2>&1 | head -3
+
+      - name: Put the pet inside the extension
+        run: node scripts/bundle-companion.mjs darwin-${{ matrix.arch }}
+
+      - name: Package the extension for darwin-${{ matrix.arch }}
+        working-directory: packages/extension
+        run: npx vsce package --target darwin-${{ matrix.arch }} --out ../../dist/bob-pet-darwin-${{ matrix.arch }}.vsix
+
+      # Unpacks the VSIX, starts the pet it carries and delivers a hook event to it the
+      # way Bob would, so a package that cannot run is never published.
+      - name: Smoke test the packaged extension
+        run: node scripts/smoke-mac.mjs dist/bob-pet-darwin-${{ matrix.arch }}.vsix ${{ matrix.arch }}
+
+      - name: Publish to Open VSX
+        env:
+          OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}
+        if: ${{ env.OVSX_PAT != '' }}
+        run: npx --yes ovsx publish dist/bob-pet-darwin-${{ matrix.arch }}.vsix
+
+      - name: Keep the build with the tag
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/bob-pet-darwin-${{ matrix.arch }}.vsix
