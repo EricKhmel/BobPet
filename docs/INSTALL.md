@@ -6,9 +6,11 @@ for Windows, `bob-pet-darwin-arm64.vsix` or `bob-pet-darwin-x64.vsix` for macOS.
 the pet is unpacked from the extension once on first run, because a `.app` cannot survive
 being carried in a zip with its symlinks and executable bits intact.
 
-**Open a folder in IBM Bob.** Bob runs each hook inside the folder you have open. A window
-with no folder open gives it nowhere to run them, and on macOS they all fail before they
-start, so the pet appears but reacts to nothing. The extension warns when it sees this.
+**Open a folder in IBM Bob.** Bob runs each hook inside the folder you have open, and with
+no folder open it uses its playground, `~/.bob/playground`, which it does not create. If
+that directory is not there the hooks cannot start at all and the pet appears but reacts to
+nothing. The extension warns when it sees this and names the directory; opening any folder
+is the quickest fix.
 
 ## From the extension (recommended)
 
@@ -60,9 +62,10 @@ Local Bob Pet settings may remain in the app data folder and can be removed manu
 
 - **VSIX rejected:** Do not alter Bob’s installation. Record the error and use the companion alone; obtain IBM’s documented extension compatibility mechanism.
 - **The pet appears but never reacts:** Open a folder in Bob. Bob starts each hook in the
-  open folder, and a window without one has no directory to start it in, which IBM Bob
-  reports only as `[Hooks] … hook failed` in its own log. Windows runs the hook anyway;
-  macOS cannot. Nothing in the pet can change this, and opening any folder fixes it.
+  open folder, or in `~/.bob/playground` when no folder is open — and it does not create
+  that playground, so on a machine that has never used it the hooks have no directory to
+  start in. IBM Bob reports this only as `[Hooks] … hook failed` in its own log. Nothing in
+  the pet can change it; opening any folder fixes it, as does creating that directory.
 - **Pet does not focus Bob:** Select IBM Bob manually. Windows may block foreground
   activation. On macOS the pet asks the system to activate **IBM Bob** by name, so nothing
   needs configuring unless you renamed or moved the application; if you did, point Bob

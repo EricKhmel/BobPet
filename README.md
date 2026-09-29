@@ -6,7 +6,7 @@ Bob Pet is an independent pixel-art desktop companion for people using IBM Bob I
 
 **Windows and macOS.** Linux is not supported yet, and the extension says so rather than half-working if it is installed there.
 
-**Open a folder in IBM Bob.** Bob starts each hook in the folder you have open, so in a window with no folder open there is nowhere to start it: on macOS every hook fails before it runs and the pet reacts to nothing. Windows is unaffected. This is Bob's behaviour, not something the pet can work around, so the extension warns you instead.
+**Open a folder in IBM Bob.** Bob starts each hook in the folder you have open, and with no folder open it uses its own playground, `~/.bob/playground` — a directory it does not create. On a machine that has never used the playground it is not there, and a hook cannot start in a directory that does not exist, so every hook fails and the pet reacts to nothing. This is Bob's behaviour, not something the pet can work around, so the extension warns you and names the directory.
 
 The transparent overlay runs without an extension: it can stay above other windows, be repositioned, use five crisp pixel sizes, animate locally, and make a user-initiated, best-effort request to focus a configured Bob window. The optional VSIX adds commands and a status-bar entry to VS Code-compatible hosts. It never modifies IBM Bob.
 

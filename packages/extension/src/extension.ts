@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path';
 import { exec, spawn, type ChildProcess } from 'node:child_process';
 import { type PetState } from '@bob-pet/shared';
 import { petDataDir } from './paths.js';
-import { HOOK_EVENTS, HOOK_TARGETS, HOOK_TIMEOUT_S, NO_FOLDER_OPEN, applyHooks, hookCommand, hooksCanRun, installedPetHooks, writeHookLauncher, type HookEntry } from './hooks.js';
+import { HOOK_EVENTS, HOOK_TARGETS, HOOK_TIMEOUT_S, applyHooks, cannotRunHooks, hookCommand, hookWorkingDir, hooksCanRun, installedPetHooks, readAgentSettings, writeHookLauncher, type HookEntry } from './hooks.js';
 import { ensureCompanion } from './install.js';
 
 let companion: ChildProcess | undefined;
@@ -355,28 +355,31 @@ async function writeHooks(entry: HookEntry | undefined): Promise<boolean> {
 }
 
 /**
- * The directory IBM Bob will start the hook in: the open folder, or nothing at all.
+ * The directory IBM Bob will start the hook in: the open folder, or Bob's playground.
  *
  * Mirrors what Bob itself does, so a test run here fails in exactly the cases a real hook
- * event would, instead of passing because the extension host happens to have a valid
- * working directory of its own.
+ * event would, instead of passing because the extension host happens to have a working
+ * directory of its own.
  */
-function hookCwd(): string {
-  return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+async function hookCwd(): Promise<{ dir: string; folderOpen: boolean }> {
+  const open = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  // Bob's own settings may move the playground, and we are already reading that file.
+  const { settings } = await readAgentSettings(HOOK_TARGETS[0].settings);
+  return { dir: hookWorkingDir(open, settings), folderOpen: Boolean(open) };
 }
 
 /**
  * Says so when the hooks are installed correctly but Bob cannot run them here.
  *
- * Only ever appears in the one situation that is genuinely broken - hooks present, no
- * folder open, and a platform where that stops Bob dead - so it is not a warning anyone
- * sees twice for no reason.
+ * Only appears when the directory Bob would start them in is genuinely missing, which is
+ * the one case where an installed, correct hook still never runs.
  */
 async function warnIfHooksCannotRun(): Promise<void> {
-  if (hooksCanRun(hookCwd())) return;
+  const { dir, folderOpen } = await hookCwd();
+  if (hooksCanRun(dir)) return;
   if ((await installedPetHooks(HOOK_TARGETS[0])).length === 0) return;
-  log(`Bob cannot run the pet's hooks in this window: no folder is open, and ${process.platform} cannot start a process without one.`);
-  void vscode.window.showWarningMessage(NO_FOLDER_OPEN);
+  log(`Bob cannot run the pet's hooks: it would start them in ${dir}, which does not exist.`);
+  void vscode.window.showWarningMessage(cannotRunHooks(dir, folderOpen));
 }
 
 async function connect(options: { ask?: boolean } = {}): Promise<void> {
@@ -410,18 +413,18 @@ async function connect(options: { ask?: boolean } = {}): Promise<void> {
   const entry: HookEntry = { type: 'command', command, timeout: HOOK_TIMEOUT_S };
   if (!(await writeHooks(entry))) return;
 
-  // The hooks are right, but Bob has nowhere to run them. Saying that is more use than a
-  // test run failing with an error about a directory nobody asked for.
-  const cwd = hookCwd();
-  if (!hooksCanRun(cwd)) {
-    log(`Hooks installed, but Bob has no folder to run them in on ${process.platform}.`);
-    void vscode.window.showWarningMessage(NO_FOLDER_OPEN);
+  // The hooks are right, but the directory Bob would run them in is not there. Saying so
+  // is more use than a test run failing with an error about a path nobody mentioned.
+  const { dir, folderOpen } = await hookCwd();
+  if (!hooksCanRun(dir)) {
+    log(`Hooks installed, but Bob would start them in ${dir}, which does not exist.`);
+    void vscode.window.showWarningMessage(cannotRunHooks(dir, folderOpen));
     return;
   }
 
   // Run it once exactly as an agent would, so a broken wiring is reported now rather
   // than as a pet that silently never moves.
-  const check = await smokeTest(command, cwd);
+  const check = await smokeTest(command, dir);
   if (!check.ok) {
     log(`Hook smoke test failed: ${check.detail}`);
     getLogger().show(true);

@@ -13,12 +13,14 @@
   applies to the window, so the speech bubble fades with the character, and it is
   remembered like the size is. Existing pets stay fully solid.
 - **The extension says when IBM Bob cannot run its hooks at all.** Bob starts each hook in
-  the folder you have open, so a window with no folder open leaves it with nowhere to run
-  them: on macOS every hook then fails before it starts and the pet reacts to nothing,
-  while Windows runs them anyway. That is Bob's behaviour and no command the pet installs
-  can survive it, so the extension now recognises it and explains it, rather than leaving
-  a pet that silently never moves. The hooks stay installed and start working the moment a
-  folder is opened.
+  the folder you have open, and with no folder open it uses its own playground,
+  `~/.bob/playground` — a directory Bob names but does not create. A hook cannot start in a
+  directory that does not exist, so on a machine that has never used the playground every
+  hook fails instantly and the pet reacts to nothing, while Bob logs only "hook failed".
+  No command the pet installs can survive that, because none of it is ever read, so the
+  extension now recognises the situation and names the directory instead of leaving a pet
+  that silently never moves. The hooks stay installed and work the moment that directory
+  exists, which opening any folder achieves.
 - The check the connect command runs now uses the same working directory Bob would, so it
   fails in the cases a real hook event would fail, and reports a hook that never started
   differently from one that ran and returned an error.

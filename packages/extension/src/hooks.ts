@@ -6,6 +6,7 @@
  * installed them.
  */
 import { chmod, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { petDataDir } from './paths.js';
 import { homedir } from 'node:os';
 import { join, dirname, posix } from 'node:path';
@@ -130,26 +131,47 @@ export function hookCommand(_target: { exe: string; hookScript: string }): strin
 }
 
 /**
- * Whether IBM Bob can run a hook at all in a window whose workspace is `cwd`.
+ * Where IBM Bob will start a hook.
  *
- * Bob passes the session's workspace straight to `exec` as the working directory of the
- * hook it spawns, and a window with no folder open has no workspace, so that string is
- * empty. Windows accepts an empty working directory and runs the command anyway; POSIX
- * specifies that `chdir("")` fails with ENOENT, so on macOS the process dies before the
- * command is even read. Bob reports that as "hook failed" for every event - the same
- * message it gives for a command that does not exist - and no command, path or launcher
- * the pet writes can survive it, because none of them is ever looked at.
- *
- * So the extension does the one useful thing available to it: say which of the two is
- * happening, rather than leaving someone with a pet that silently never moves.
+ * Bob hands the session's workspace to `exec` as the hook's working directory. With a
+ * folder open that is the folder. With none open Bob does not pass nothing - an empty
+ * working directory would simply be ignored - it works in its own playground instead,
+ * `~/.bob/playground`, or whatever `playgroundPath` in its settings names.
  */
-export const hooksCanRun = (cwd: string, platform: NodeJS.Platform = process.platform): boolean =>
-  platform === 'win32' || cwd.trim() !== '';
+export const bobPlaygroundDir = (settings: Record<string, unknown> = {}, home = homedir()): string => {
+  const configured = settings.playgroundPath;
+  if (typeof configured === 'string' && configured.trim() !== '') return configured;
+  return join(home, '.bob', 'playground');
+};
 
-export const NO_FOLDER_OPEN =
-  'IBM Bob has no folder open, and it runs its hooks inside the open folder. Until you open one, ' +
-  'Bob cannot run the pet’s hook and the pet will not react to what Bob does. The hooks stay ' +
-  'installed, so opening a folder is all it takes.';
+export const hookWorkingDir = (
+  openFolder: string | undefined,
+  settings: Record<string, unknown> = {},
+  home = homedir()
+): string => (openFolder && openFolder.trim() !== '' ? openFolder : bobPlaygroundDir(settings, home));
+
+/**
+ * Whether IBM Bob can run a hook at all from that directory.
+ *
+ * A working directory that does not exist stops the process before its command is read:
+ * the spawn fails with ENOENT, so there is no exit code, and Bob reports `hook failed` -
+ * the same thing it says about a command that does not exist. Nothing the pet writes into
+ * the command can survive it, because none of it is ever looked at.
+ *
+ * Bob's playground is the case that bites: a machine where nobody has used it does not
+ * have the folder, so with no folder open every hook fails, while opening any folder
+ * makes all of them work. This is not platform-specific, however much it looks it - an
+ * empty working directory, which is what an earlier version of this check blamed, is
+ * discarded by Node before the process is started and harms nothing anywhere.
+ */
+export const hooksCanRun = (dir: string, exists: (path: string) => boolean = existsSync): boolean =>
+  exists(dir);
+
+/** Why the pet will not react, naming the directory Bob could not start its hook in. */
+export const cannotRunHooks = (dir: string, folderOpen: boolean): string =>
+  folderOpen
+    ? `IBM Bob runs its hooks in ${dir}, and that folder does not exist, so it cannot start the pet’s hook and the pet will not react.`
+    : `IBM Bob has no folder open, so it runs in its playground, ${dir} — and that folder does not exist yet, so Bob cannot start the pet’s hook and the pet will not react. Open a folder in Bob, or create that folder. The hooks stay installed either way.`;
 
 /**
  * One agent's settings, and whether they could be read at all.

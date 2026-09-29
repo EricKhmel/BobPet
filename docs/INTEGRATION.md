@@ -34,23 +34,30 @@ the mapping survives Bob renaming or adding tools.
 ### A window with no folder open
 
 IBM Bob starts each hook with `child_process.exec`, passing the session's workspace as the
-child's working directory. A window with no folder open has no workspace, so that value is
-an empty string. Windows starts the process regardless; POSIX specifies that `chdir("")`
-fails with `ENOENT`, so on macOS the process dies before the command is read. Bob reports
-this as `[Hooks] <event> hook failed`, which is the message it logs whenever a hook
-produces no exit code at all — the same thing it would say about a command that does not
-exist.
+child's working directory. With no folder open Bob does not leave that empty — it works in
+its playground instead, `~/.bob/playground`, or whatever `playgroundPath` in its settings
+names. Bob normalises that path but does not create it, so on a machine where the
+playground has never been used the directory does not exist, and a working directory that
+does not exist stops the spawn with `ENOENT` before the command is read. Bob reports that
+as `[Hooks] <event> hook failed`, which is the message it logs whenever a hook produces no
+exit code at all — the same thing it would say about a command that does not exist.
+
+This is not platform-specific. An empty working directory, which looks like the obvious
+culprit, is discarded by Node before the process starts and harms nothing on any platform.
 
 Verified against IBM Bob 1.126.0+bob2.2.0 on macOS: with no folder open, six different
 hook commands — including `/bin/sh -c 'echo … >> file'` — all failed within 15ms and none
-produced any output; with a folder open, the pet's hook runs and the pet reacts.
+produced any output; with a folder open, the pet's hook runs and the pet reacts. The
+behaviour of `exec` with a missing and with an empty working directory is asserted in the
+extension's own tests, on whichever platform they run.
 
 Nothing in the pet can affect this, since no part of the command it installs is ever
-looked at. The extension detects the situation instead and says so, and the hooks it
-installed start working as soon as a folder is opened. `type: "http"` hooks would bypass
-the spawn entirely, but Bob requires an HTTPS URL (`ue.url({ protocol: /^https$/ })`),
-which a loopback listener cannot satisfy without installing a trusted certificate on the
-user's machine — out of the question for this.
+looked at. The extension detects the situation instead and says so, naming the directory,
+and the hooks it installed start working as soon as that directory exists — which opening
+any folder achieves. `type: "http"` hooks would bypass the spawn entirely, but Bob requires
+an HTTPS URL (`ue.url({ protocol: /^https$/ })`), which a loopback listener cannot satisfy
+without installing a trusted certificate on the user's machine — out of the question for
+this.
 
 Bob injects a hook's stdout into the model's context on `SessionStart` and
 `UserPromptSubmit`, and treats exit code 2 as "block the prompt or tool call". The hook
