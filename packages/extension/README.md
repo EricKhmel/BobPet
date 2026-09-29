@@ -9,13 +9,19 @@ between steps, and throws confetti when Bob finishes. It tells you what Bob is o
 npm test", "Editing index.ts" — and, when Bob is waiting for you to approve something, it
 says so. Click it to bring Bob back to the front.
 
-**Windows only for now.** IBM Bob also runs on macOS and Linux; the pet does not yet.
+**Windows and macOS.** Linux is not supported yet.
+
+> **Open a folder in IBM Bob.** The pet follows Bob's hooks, and Bob runs those hooks inside
+> the folder you have open. With no folder open it falls back to its own playground
+> directory, which does not always exist — and a hook cannot run in a directory that is not
+> there, so the pet appears but reacts to nothing. Opening any folder is the sure way.
 
 ## Installing
 
 Install the extension and answer **Set up Bob Pet**. The pet itself comes with the
 extension — nothing is downloaded and nothing is installed system-wide, so no administrator
-rights are needed.
+rights are needed. You are given the build for your own machine automatically, on both
+Windows and Apple Silicon or Intel Macs.
 
 The one thing it asks permission for is **hooks in Bob's settings**
 (`~/.bob/settings/settings.json`), which is how the pet learns what Bob is doing. They print
@@ -30,7 +36,7 @@ Decline and nothing is touched. Uninstalling the extension removes the hooks aga
 
 - **Drag** the pet anywhere; it remembers where you left it.
 - **Right-click the pet** for everything it can do: its state, its size (five, from 48px to
-  192px), pausing its animation, and quitting it.
+  192px), how see-through it is (25%, 50%, 75%, 100%), pausing its animation, and quitting it.
 - **Click** it to bring IBM Bob to the front.
 - The speech bubble shows the step Bob is on, with a timer once a step runs long, and a
   summary when Bob finishes: "All done in 4m 12s: 12 steps, 3 files changed, 2 commands run".
