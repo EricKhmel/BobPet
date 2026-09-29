@@ -15,14 +15,14 @@ import { layoutFor, petOrigin, windowOrigin } from './layout.js';
 import { removeSessionFile, sessionFilePath, writeSessionFile } from './session-file.js';
 import { pendingApprovalsSince, stepLine, STILL_RUNNING_MS } from './bob-approvals.js';
 import { DatabaseSync } from 'node:sqlite';
-import { PET_SCALES } from '@bob-pet/shared';
+import { PET_SCALES, defaultSettings } from '@bob-pet/shared';
 
 test('pet size calculation for all scales', () => {
-  assert.equal(petSize({ schemaVersion: 1, scale: 'mini', muted: true, paused: false, animationEnabled: true, idleMinutes: 15 }), 48);
-  assert.equal(petSize({ schemaVersion: 1, scale: 'standard', muted: true, paused: false, animationEnabled: true, idleMinutes: 15 }), 64);
-  assert.equal(petSize({ schemaVersion: 1, scale: 'medium', muted: true, paused: false, animationEnabled: true, idleMinutes: 15 }), 96);
-  assert.equal(petSize({ schemaVersion: 1, scale: 'large', muted: true, paused: false, animationEnabled: true, idleMinutes: 15 }), 128);
-  assert.equal(petSize({ schemaVersion: 1, scale: 'xl', muted: true, paused: false, animationEnabled: true, idleMinutes: 15 }), 192);
+  assert.equal(petSize({ ...defaultSettings(), scale: 'mini' }), 48);
+  assert.equal(petSize({ ...defaultSettings(), scale: 'standard' }), 64);
+  assert.equal(petSize({ ...defaultSettings(), scale: 'medium' }), 96);
+  assert.equal(petSize({ ...defaultSettings(), scale: 'large' }), 128);
+  assert.equal(petSize({ ...defaultSettings(), scale: 'xl' }), 192);
 });
 
 test('focus adapter fallback handles missing/invalid executable gracefully', async () => {

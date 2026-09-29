@@ -62,8 +62,17 @@ export const PET_HEADROOM_ROWS = 4;
 export const PET_GRID_ROWS = 64 + PET_HEADROOM_ROWS;
 /** On-screen height of the pet at a given width, keeping its pixels square. */
 export const petHeightFor = (width: number): number => Math.round((width * PET_GRID_ROWS) / 64);
-export type StoredSettings = { schemaVersion: 1; scale: PetScaleName; muted: boolean; paused: boolean; animationEnabled: boolean; bobExecutablePath?: string; position?: { x: number; y: number }; idleMinutes: number };
-export const defaultSettings = (): StoredSettings => ({ schemaVersion: 1, scale: 'medium', muted: true, paused: false, animationEnabled: true, idleMinutes: 15 });
+/**
+ * How solid the pet is, as a percentage. 100 is the pet as drawn; lower lets the window
+ * behind it show through, for anyone who wants it present without it being in the way.
+ */
+export const PET_OPACITIES = [25, 50, 75, 100] as const;
+export type PetOpacity = (typeof PET_OPACITIES)[number];
+export const isPetOpacity = (value: unknown): value is PetOpacity =>
+  typeof value === 'number' && (PET_OPACITIES as readonly number[]).includes(value);
+
+export type StoredSettings = { schemaVersion: 1; scale: PetScaleName; opacity: PetOpacity; muted: boolean; paused: boolean; animationEnabled: boolean; bobExecutablePath?: string; position?: { x: number; y: number }; idleMinutes: number };
+export const defaultSettings = (): StoredSettings => ({ schemaVersion: 1, scale: 'medium', opacity: 100, muted: true, paused: false, animationEnabled: true, idleMinutes: 15 });
 export function migrateSettings(value: unknown): StoredSettings {
   const defaults = defaultSettings();
   if (!value || typeof value !== 'object' || Array.isArray(value)) return defaults;
@@ -71,7 +80,7 @@ export function migrateSettings(value: unknown): StoredSettings {
   const scale = typeof source.scale === 'string' && Object.hasOwn(PET_SCALES, source.scale) ? source.scale as PetScaleName : defaults.scale;
   const position = source.position && typeof source.position === 'object' && typeof (source.position as Record<string, unknown>).x === 'number' && typeof (source.position as Record<string, unknown>).y === 'number'
     ? { x: (source.position as { x: number }).x, y: (source.position as { y: number }).y } : undefined;
-  return { ...defaults, scale, muted: typeof source.muted === 'boolean' ? source.muted : defaults.muted, paused: typeof source.paused === 'boolean' ? source.paused : defaults.paused, animationEnabled: typeof source.animationEnabled === 'boolean' ? source.animationEnabled : defaults.animationEnabled, bobExecutablePath: typeof source.bobExecutablePath === 'string' ? source.bobExecutablePath : undefined, position, idleMinutes: typeof source.idleMinutes === 'number' && source.idleMinutes >= 1 && source.idleMinutes <= 240 ? source.idleMinutes : defaults.idleMinutes };
+  return { ...defaults, scale, opacity: isPetOpacity(source.opacity) ? source.opacity : defaults.opacity, muted: typeof source.muted === 'boolean' ? source.muted : defaults.muted, paused: typeof source.paused === 'boolean' ? source.paused : defaults.paused, animationEnabled: typeof source.animationEnabled === 'boolean' ? source.animationEnabled : defaults.animationEnabled, bobExecutablePath: typeof source.bobExecutablePath === 'string' ? source.bobExecutablePath : undefined, position, idleMinutes: typeof source.idleMinutes === 'number' && source.idleMinutes >= 1 && source.idleMinutes <= 240 ? source.idleMinutes : defaults.idleMinutes };
 }
 export type Bounds = { x: number; y: number; width: number; height: number };
 export function clampPosition(position: { x: number; y: number } | undefined, displays: Bounds[], size: number): { x: number; y: number } {

@@ -130,6 +130,28 @@ export function hookCommand(_target: { exe: string; hookScript: string }): strin
 }
 
 /**
+ * Whether IBM Bob can run a hook at all in a window whose workspace is `cwd`.
+ *
+ * Bob passes the session's workspace straight to `exec` as the working directory of the
+ * hook it spawns, and a window with no folder open has no workspace, so that string is
+ * empty. Windows accepts an empty working directory and runs the command anyway; POSIX
+ * specifies that `chdir("")` fails with ENOENT, so on macOS the process dies before the
+ * command is even read. Bob reports that as "hook failed" for every event - the same
+ * message it gives for a command that does not exist - and no command, path or launcher
+ * the pet writes can survive it, because none of them is ever looked at.
+ *
+ * So the extension does the one useful thing available to it: say which of the two is
+ * happening, rather than leaving someone with a pet that silently never moves.
+ */
+export const hooksCanRun = (cwd: string, platform: NodeJS.Platform = process.platform): boolean =>
+  platform === 'win32' || cwd.trim() !== '';
+
+export const NO_FOLDER_OPEN =
+  'IBM Bob has no folder open, and it runs its hooks inside the open folder. Until you open one, ' +
+  'Bob cannot run the pet’s hook and the pet will not react to what Bob does. The hooks stay ' +
+  'installed, so opening a folder is all it takes.';
+
+/**
  * One agent's settings, and whether they could be read at all.
  *
  * The difference matters: a file that is not there yet is an empty object we may safely

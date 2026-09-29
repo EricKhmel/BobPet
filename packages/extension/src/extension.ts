@@ -8,7 +8,7 @@ import { join, dirname } from 'node:path';
 import { exec, spawn, type ChildProcess } from 'node:child_process';
 import { type PetState } from '@bob-pet/shared';
 import { petDataDir } from './paths.js';
-import { HOOK_EVENTS, HOOK_TARGETS, HOOK_TIMEOUT_S, applyHooks, hookCommand, installedPetHooks, writeHookLauncher, type HookEntry } from './hooks.js';
+import { HOOK_EVENTS, HOOK_TARGETS, HOOK_TIMEOUT_S, NO_FOLDER_OPEN, applyHooks, hookCommand, hooksCanRun, installedPetHooks, writeHookLauncher, type HookEntry } from './hooks.js';
 import { ensureCompanion } from './install.js';
 
 let companion: ChildProcess | undefined;
@@ -354,6 +354,31 @@ async function writeHooks(entry: HookEntry | undefined): Promise<boolean> {
   return true;
 }
 
+/**
+ * The directory IBM Bob will start the hook in: the open folder, or nothing at all.
+ *
+ * Mirrors what Bob itself does, so a test run here fails in exactly the cases a real hook
+ * event would, instead of passing because the extension host happens to have a valid
+ * working directory of its own.
+ */
+function hookCwd(): string {
+  return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+}
+
+/**
+ * Says so when the hooks are installed correctly but Bob cannot run them here.
+ *
+ * Only ever appears in the one situation that is genuinely broken - hooks present, no
+ * folder open, and a platform where that stops Bob dead - so it is not a warning anyone
+ * sees twice for no reason.
+ */
+async function warnIfHooksCannotRun(): Promise<void> {
+  if (hooksCanRun(hookCwd())) return;
+  if ((await installedPetHooks(HOOK_TARGETS[0])).length === 0) return;
+  log(`Bob cannot run the pet's hooks in this window: no folder is open, and ${process.platform} cannot start a process without one.`);
+  void vscode.window.showWarningMessage(NO_FOLDER_OPEN);
+}
+
 async function connect(options: { ask?: boolean } = {}): Promise<void> {
   const companion = resolveCompanion();
   if (!companion) {
@@ -385,9 +410,18 @@ async function connect(options: { ask?: boolean } = {}): Promise<void> {
   const entry: HookEntry = { type: 'command', command, timeout: HOOK_TIMEOUT_S };
   if (!(await writeHooks(entry))) return;
 
+  // The hooks are right, but Bob has nowhere to run them. Saying that is more use than a
+  // test run failing with an error about a directory nobody asked for.
+  const cwd = hookCwd();
+  if (!hooksCanRun(cwd)) {
+    log(`Hooks installed, but Bob has no folder to run them in on ${process.platform}.`);
+    void vscode.window.showWarningMessage(NO_FOLDER_OPEN);
+    return;
+  }
+
   // Run it once exactly as an agent would, so a broken wiring is reported now rather
   // than as a pet that silently never moves.
-  const check = await smokeTest(command);
+  const check = await smokeTest(command, cwd);
   if (!check.ok) {
     log(`Hook smoke test failed: ${check.detail}`);
     getLogger().show(true);
@@ -401,12 +435,19 @@ async function connect(options: { ask?: boolean } = {}): Promise<void> {
   );
 }
 
-/** Invokes the shim the way both agents do: `exec` with the payload on stdin. */
-function smokeTest(command: string): Promise<{ ok: boolean; detail: string }> {
+/**
+ * Invokes the shim the way both agents do: `exec` with the payload on stdin, from the
+ * same working directory Bob would use. Bob reads no exit code at all when the process
+ * cannot be started, which is the one failure its own log cannot tell apart from any
+ * other, so it is reported here in the terms that explain it.
+ */
+function smokeTest(command: string, cwd: string): Promise<{ ok: boolean; detail: string }> {
   return new Promise((resolve) => {
-    const child = exec(command, { timeout: 10000, windowsHide: true }, (error, stdout) => {
+    const child = exec(command, { cwd, timeout: 10000, windowsHide: true }, (error, stdout) => {
       const code = typeof error?.code === 'number' ? error.code : error ? null : 0;
-      if (code !== 0) {
+      if (code === null) {
+        resolve({ ok: false, detail: `it never started in ${cwd} (${error?.message ?? 'no exit code'})` });
+      } else if (code !== 0) {
         resolve({ ok: false, detail: `exit code ${String(code)} (is the companion installed?)` });
       } else if (stdout.trim()) {
         // Output would be injected into the model's context, so this must never happen.
@@ -416,7 +457,7 @@ function smokeTest(command: string): Promise<{ ok: boolean; detail: string }> {
       }
     });
     child.stdin?.on('error', () => undefined);
-    child.stdin?.end(JSON.stringify({ session_id: 'bob-pet-smoke-test', cwd: '', hook_event_name: 'SessionStart', source: 'startup' }));
+    child.stdin?.end(JSON.stringify({ session_id: 'bob-pet-smoke-test', cwd, hook_event_name: 'SessionStart', source: 'startup' }));
   });
 }
 
@@ -538,6 +579,7 @@ export function activate(context: vscode.ExtensionContext): void {
       if (!bundledCompanion) log('No pet found inside this extension for this platform.');
       await refreshHooks();
       await setUp(context, false);
+      await warnIfHooksCannotRun();
       if (vscode.workspace.getConfiguration('bobPet').get<boolean>('autoStart', true) && resolveCompanion()) await start();
     } catch (error) {
       // Without this the whole start-up path dies silently: no hooks, no pet, and nothing

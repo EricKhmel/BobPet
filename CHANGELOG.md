@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.2.0 — 2026-09-29
+
+### Added
+
+- **macOS.** The pet runs on Apple Silicon and Intel Macs: the extension carries the
+  application for the platform it was installed for and unpacks it on first run, the
+  overlay floats above other windows and passes clicks through, and clicking the pet
+  activates IBM Bob by name, so nothing has to be configured first. Built and smoke-tested
+  on Apple hardware for both architectures. Linux is still not supported.
+- **Transparency.** Right-click the pet → **Transparency** for 25%, 50%, 75% or 100%. It
+  applies to the window, so the speech bubble fades with the character, and it is
+  remembered like the size is. Existing pets stay fully solid.
+- **The extension says when IBM Bob cannot run its hooks at all.** Bob starts each hook in
+  the folder you have open, so a window with no folder open leaves it with nowhere to run
+  them: on macOS every hook then fails before it starts and the pet reacts to nothing,
+  while Windows runs them anyway. That is Bob's behaviour and no command the pet installs
+  can survive it, so the extension now recognises it and explains it, rather than leaving
+  a pet that silently never moves. The hooks stay installed and start working the moment a
+  folder is opened.
+- The check the connect command runs now uses the same working directory Bob would, so it
+  fails in the cases a real hook event would fail, and reports a hook that never started
+  differently from one that ran and returned an error.
+
 ## 0.1.5 — 2026-09-26
 
 ### Fixed

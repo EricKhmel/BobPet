@@ -2,7 +2,7 @@
 import './quiet.js';
 import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, screen } from 'electron';
 import { randomBytes } from 'node:crypto';
-import { PET_SCALES, countStep, dragOutcome, dropDuration, dropIn, migrateSettings, startTally, wrapUp, type PetScaleName, type PetState, type TaskTally } from '@bob-pet/shared';
+import { PET_OPACITIES, PET_SCALES, countStep, dragOutcome, dropDuration, dropIn, migrateSettings, startTally, wrapUp, type PetOpacity, type PetScaleName, type PetState, type TaskTally } from '@bob-pet/shared';
 import { LocalPetServer } from './ipc-server.js';
 import { createFocusAdapter } from './focus.js';
 import { SettingsStore } from './settings.js';
@@ -331,6 +331,23 @@ async function chooseBobExecutable(): Promise<void> {
   petWindow?.webContents.send('pet:settings', next);
   petWindow?.webContents.send('pet:notice', 'IBM Bob location saved');
 }
+/**
+ * Applies the stored transparency to the window.
+ *
+ * Done on the window rather than in the renderer so the speech bubble fades with the pet
+ * instead of the two drifting apart, and so nothing has to be repainted to change it.
+ */
+function applyOpacity(opacity: PetOpacity): void {
+  petWindow?.setOpacity(opacity / 100);
+}
+
+async function setOpacity(opacity: PetOpacity): Promise<void> {
+  const next = { ...(await store.read()), opacity };
+  applyOpacity(opacity);
+  await store.write(next);
+  petWindow?.webContents.send('pet:settings', next);
+}
+
 async function resize(scale: PetScaleName): Promise<void> {
   const settings = await store.read();
   const next = { ...settings, scale };
@@ -357,9 +374,16 @@ async function contextMenu(): Promise<void> {
     checked: currentSettings.scale === scaleKey,
     click: () => void resize(scaleKey)
   }));
+  const opacities = PET_OPACITIES.map((value) => ({
+    label: `${value}%`,
+    type: 'radio' as const,
+    checked: currentSettings.opacity === value,
+    click: () => void setOpacity(value)
+  }));
   const menu = Menu.buildFromTemplate([
     { label: 'Pet State', submenu: states },
     { label: 'Size', submenu: scales },
+    { label: 'Transparency', submenu: opacities },
     { type: 'separator' },
     { label: 'Focus IBM Bob', click: () => void focusBob() },
     { label: 'Set IBM Bob Location…', click: () => void chooseBobExecutable() },
@@ -399,6 +423,7 @@ async function startup(): Promise<void> {
   if (await store.migrate()) console.log('Adopted settings from the legacy user-data folder');
   const settings = await store.read();
   petWindow = createPetWindow(settings);
+  applyOpacity(settings.opacity);
   // Only a development build follows this. In a packaged pet it is ignored, so nothing
   // that can set an environment variable can point the window at a page of its choosing.
   const devServer = app.isPackaged ? undefined : process.env.BOB_PET_DEV_SERVER;

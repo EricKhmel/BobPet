@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PET_STATES, PET_SCALES, clampPosition, migrateSettings, parseMessage, defaultSettings, dragOutcome, stateForHook, describeHook, dropDuration, dropIn, petDataDir, startTally, countStep, wrapUp, formatElapsed } from './index.js';
+import { PET_STATES, PET_SCALES, PET_OPACITIES, clampPosition, migrateSettings, parseMessage, defaultSettings, dragOutcome, stateForHook, describeHook, dropDuration, dropIn, petDataDir, startTally, countStep, wrapUp, formatElapsed } from './index.js';
 
 test('protocol validation: accepts exact protocol messages and valid states', () => {
   for (const state of PET_STATES) {
@@ -61,6 +61,13 @@ test('settings migration: handles defaults, migrations, and bounds checking', ()
   // Invalid idleMinutes falls back
   assert.equal(migrateSettings({ idleMinutes: -1 }).idleMinutes, 15);
   assert.equal(migrateSettings({ idleMinutes: 30 }).idleMinutes, 30);
+
+  // Transparency: settings written before it existed leave the pet solid.
+  assert.equal(defaults.opacity, 100);
+  assert.equal(migrateSettings({ scale: 'large' }).opacity, 100);
+  for (const opacity of PET_OPACITIES) assert.equal(migrateSettings({ opacity }).opacity, opacity);
+  // Anything else would make the pet invisible or unreadable, so it is refused.
+  for (const bad of [0, 10, 101, -50, '50', null]) assert.equal(migrateSettings({ opacity: bad }).opacity, 100);
 });
 
 test('clampPosition: clamps coordinates to valid visible work areas', () => {

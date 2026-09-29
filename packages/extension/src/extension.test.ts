@@ -4,7 +4,7 @@ import { parseMessage, PET_STATES } from '@bob-pet/shared';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { HOOK_EVENTS, HOOK_MARKER, applyHooks, installedPetHooks } from './hooks.js';
+import { HOOK_EVENTS, HOOK_MARKER, applyHooks, hooksCanRun, installedPetHooks } from './hooks.js';
 
 test('extension protocol payload does not permit arbitrary commands', () => {
   assert.equal(parseMessage({ version: 1, type: 'run', command: 'whoami' }), undefined);
@@ -32,6 +32,24 @@ test('extension protocol payload only validates safe known types and states', ()
     version: 1,
     type: 'ping'
   });
+});
+
+test('a window with no folder open stops Bob running hooks everywhere but Windows', async (t) => {
+  // Bob hands its workspace to exec as the hook's working directory, and an empty string
+  // is not a directory on POSIX. This is the whole reason the extension warns.
+  assert.equal(hooksCanRun('', 'darwin'), false);
+  assert.equal(hooksCanRun('   ', 'linux'), false);
+  assert.equal(hooksCanRun('/Users/someone/project', 'darwin'), true);
+  // Windows starts the process regardless, which is why this was never seen there.
+  assert.equal(hooksCanRun('', 'win32'), true);
+
+  // And the claim itself, checked against the platform actually running the test.
+  const { exec } = await import('node:child_process');
+  const ran = await new Promise<boolean>((resolve) => {
+    exec('echo hi', { cwd: '', timeout: 5000 }, (error) => resolve(!error));
+  });
+  t.diagnostic(`exec with an empty cwd on ${process.platform}: ${ran ? 'ran' : 'failed to start'}`);
+  assert.equal(ran, hooksCanRun('', process.platform), 'the warning must match what this platform really does');
 });
 
 test("hooks are not written when Bob's settings cannot be read", async () => {
