@@ -9,6 +9,10 @@
   overlay floats above other windows and passes clicks through, and clicking the pet
   activates IBM Bob by name, so nothing has to be configured first. Built and smoke-tested
   on Apple hardware for both architectures. Linux is still not supported.
+- **Clicking the pet focuses IBM Bob on macOS without configuring anything.** It asks
+  macOS to activate IBM Bob by name, and falls back to `/Applications/IBM Bob.app` if that
+  lookup finds nothing; a location you chose yourself is still tried first. Previously the
+  pet gave up and asked for the location whenever none was set, which on macOS was always.
 - **Transparency.** Right-click the pet → **Transparency** for 25%, 50%, 75% or 100%. It
   applies to the window, so the speech bubble fades with the character, and it is
   remembered like the size is. Existing pets stay fully solid.

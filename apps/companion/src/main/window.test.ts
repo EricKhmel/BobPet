@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { petSize } from './window.js';
-import { MacFocusAdapter } from './focus-mac.js';
+import { MacFocusAdapter, activationTargets } from './focus-mac.js';
 import { createFocusAdapter, WindowsFocusAdapter, sanitizeProcessName } from './focus.js';
 import { LocalPetServer } from './ipc-server.js';
 import { Socket } from 'node:net';
@@ -307,6 +307,18 @@ test('the macOS adapter finds IBM Bob by name, and refuses rather than claiming 
   assert.equal(unset.ok, false);
   assert.match(unset.message, /IBM Bob/i, 'and say which application it means');
   adapter.dispose();
+
+  // What it asks macOS to activate, in order. Activating Bob by its full path is the one
+  // part confirmed on a real Mac, so the usual location is kept as a last resort behind
+  // the name lookup rather than dropped.
+  assert.deepEqual(activationTargets(), ['IBM Bob', '/Applications/IBM Bob.app']);
+  assert.deepEqual(activationTargets('  '), ['IBM Bob', '/Applications/IBM Bob.app']);
+  assert.deepEqual(activationTargets('/Users/someone/Apps/IBM Bob.app'), [
+    '/Users/someone/Apps/IBM Bob.app',
+    'IBM Bob',
+    '/Applications/IBM Bob.app'
+  ], 'a chosen location is tried first');
+  assert.deepEqual(activationTargets('/Applications/IBM Bob.app'), ['/Applications/IBM Bob.app', 'IBM Bob'], 'and never tried twice');
 
   // Whatever the platform, choosing an adapter always returns one that answers.
   assert.ok(createFocusAdapter('win32'));

@@ -18,6 +18,27 @@ const ACTIVATE_TIMEOUT_MS = 4_000;
 /** What the application is called on macOS, which is how the system finds it. */
 const APP_NAME = 'IBM Bob';
 
+/**
+ * Where a normal install puts it, tried last.
+ *
+ * A name is resolved by Launch Services, which is the better thing to ask for: it finds
+ * the application wherever the user keeps it. But that lookup is the one part of this
+ * never confirmed on a real Mac, while activating Bob by its full path is confirmed, so
+ * the usual location is worth one more attempt before telling someone to go and find it
+ * themselves.
+ */
+const APP_PATH = `/Applications/${APP_NAME}.app`;
+
+/**
+ * Everything worth asking macOS to activate, best first: what the user chose, then the
+ * name, then the usual location. Deduped, so someone who configured the usual location is
+ * not asked for it twice.
+ */
+export const activationTargets = (configured?: string): string[] => {
+  const path = configured?.trim();
+  return [...new Set([...(path ? [path] : []), APP_NAME, APP_PATH])];
+};
+
 export class MacFocusAdapter implements FocusAdapter {
   warmUp(): void {
     // Nothing to warm: `open` is a system binary with no start-up cost worth paying early.
@@ -25,12 +46,10 @@ export class MacFocusAdapter implements FocusAdapter {
 
   async focusConfiguredApp(target: FocusTarget = {}): Promise<FocusResult> {
     // `open -a` takes a bundle path or an application name, and macOS resolves the name
-    // itself. So unlike Windows, nothing has to be configured first: the name is tried
-    // when no path is set, and a configured path still wins if there is one.
-    const path = target.path?.trim();
-    const attempts = path ? [path, APP_NAME] : [APP_NAME];
+    // itself. So unlike Windows, nothing has to be configured first: what the user chose
+    // wins if they chose anything, then the name, then the usual location.
     let lastSaid = '';
-    for (const attempt of attempts) {
+    for (const attempt of activationTargets(target.path)) {
       const outcome = await this.activate(attempt);
       if (outcome.ok) return outcome;
       lastSaid = outcome.message;
