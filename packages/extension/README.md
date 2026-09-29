@@ -1,5 +1,9 @@
 # Bob Pet
 
+> ⚠️ **Open a folder in IBM Bob before you use the pet.** **Bob runs its hooks inside the
+> folder you have open, and the pet follows those hooks — so in a window with no folder open
+> the pet appears but never reacts to anything Bob does.**
+
 A pixel-art desktop pet that acts out what IBM Bob is doing.
 
 ![Bob Pet reacting as Bob thinks, runs a command, reads a file and finishes](https://raw.githubusercontent.com/EricKhmel/BobPet/main/docs/media/bobpet.gif)
@@ -10,11 +14,6 @@ npm test", "Editing index.ts" — and, when Bob is waiting for you to approve so
 says so. Click it to bring Bob back to the front.
 
 **Windows and macOS.** Linux is not supported yet.
-
-> **Open a folder in IBM Bob.** The pet follows Bob's hooks, and Bob runs those hooks inside
-> the folder you have open. With no folder open it falls back to its own playground
-> directory, which does not always exist — and a hook cannot run in a directory that is not
-> there, so the pet appears but reacts to nothing. Opening any folder is the sure way.
 
 ## Installing
 
