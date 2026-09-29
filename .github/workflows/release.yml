@@ -1,9 +1,14 @@
 # Builds and publishes a release. The companion ships inside the extension, so there is
 # nothing to host and nothing for the extension to fetch at runtime.
 #
-# One job per platform: each VSIX carries the pet built for that platform, and a macOS
-# .app can only be produced on Apple hardware. Open VSX takes one upload per target, so
-# a host installing the extension gets the build for the machine it is running on.
+# One build job per platform: each VSIX carries the pet built for that platform, and a
+# macOS .app can only be produced on Apple hardware. Open VSX takes one upload per target,
+# so a host installing the extension gets the build for the machine it is running on.
+#
+# Nothing is published until every build has passed. Publishing per job would mean a
+# failure on one platform leaving the version live on the others, and a version that is
+# already on Open VSX cannot be replaced - the only way out is to abandon the number and
+# release the next one.
 #
 # Tag a commit to release, e.g. `git tag v0.2.0 && git push origin v0.2.0`.
 name: Release
@@ -34,29 +39,10 @@ jobs:
       - name: Package the extension with the companion inside it
         run: npm run package --workspace=bob-pet
 
-      # Named from what was built, so a version bump needs no edit here.
-      - name: Find the packaged extension
-        shell: bash
-        run: echo "VSIX=$(ls dist/bob-pet-*.vsix)" >> "$GITHUB_ENV"
-
-      - name: Checksums
-        run: npm run checksums
-
-      # Skipped until OPEN_VSX_TOKEN is added to the repository's secrets.
-      - name: Publish to Open VSX
-        env:
-          OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}
-        if: ${{ env.OVSX_PAT != '' }}
-        # ovsx reads OVSX_PAT from the environment; passing it as an argument would put
-        # the token on the command line, where anything on the runner can read it.
-        run: npx --yes ovsx publish $env:VSIX
-
-      - name: Keep the build with the tag
-        uses: softprops/action-gh-release@v2
+      - uses: actions/upload-artifact@v4
         with:
-          files: |
-            ${{ env.VSIX }}
-            dist/SHA256SUMS.txt
+          name: bob-pet-win32-x64
+          path: dist/bob-pet-*.vsix
 
   macos:
     runs-on: macos-latest
@@ -100,13 +86,55 @@ jobs:
       - name: Smoke test the packaged extension
         run: node scripts/smoke-mac.mjs dist/bob-pet-darwin-${{ matrix.arch }}.vsix ${{ matrix.arch }}
 
-      - name: Publish to Open VSX
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bob-pet-darwin-${{ matrix.arch }}
+          path: dist/bob-pet-darwin-${{ matrix.arch }}.vsix
+
+  publish:
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Every build's package, flattened into dist/ the way a local build leaves them.
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Check every target is here
+        shell: bash
+        run: |
+          ls -l dist
+          for target in bob-pet-0*.vsix bob-pet-darwin-arm64.vsix bob-pet-darwin-x64.vsix; do
+            ls dist/$target >/dev/null || { echo "::error title=Missing package::$target was not built"; exit 1; }
+          done
+
+      - name: Checksums
+        run: npm run checksums
+
+      # Skipped until OPEN_VSX_TOKEN is added to the repository's secrets. ovsx reads
+      # OVSX_PAT from the environment; passing it as an argument would put the token on the
+      # command line, where anything on the runner can read it.
+      - name: Publish every target to Open VSX
         env:
           OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}
         if: ${{ env.OVSX_PAT != '' }}
-        run: npx --yes ovsx publish dist/bob-pet-darwin-${{ matrix.arch }}.vsix
+        shell: bash
+        run: |
+          set -e
+          for vsix in dist/*.vsix; do
+            echo "Publishing $vsix"
+            npx --yes ovsx publish "$vsix"
+          done
 
-      - name: Keep the build with the tag
+      - name: Keep the builds with the tag
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/bob-pet-darwin-${{ matrix.arch }}.vsix
+          files: |
+            dist/*.vsix
+            dist/SHA256SUMS.txt
