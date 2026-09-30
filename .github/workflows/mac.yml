@@ -26,6 +26,21 @@ jobs:
           cache: npm
 
       - run: npm ci
+      # Electron fetches its binary in a postinstall, and that download sometimes fails on
+      # a runner. The binary is missing rather than the package, so `npm ci` still reports
+      # success and the failure only appears later, as require('electron') throwing while a
+      # test file loads - which reads as a mysterious test failure. Rebuild once, and say
+      # plainly what happened if it still is not there.
+      - name: Make sure Electron's binary really downloaded
+        shell: bash
+        run: |
+          have_electron() { node -e "require('electron')" >/dev/null 2>&1; }
+          if ! have_electron; then
+            echo "Electron binary missing after install; rebuilding once."
+            npm rebuild electron
+          fi
+          have_electron || { echo "::error title=Electron install failed::Electron binary could not be downloaded on this runner. This is an install problem, not a test failure."; exit 1; }
+          node -e "console.log('Electron binary at', require('electron'))"
 
       # A run's logs and summary both need a sign-in to read, but annotations do not, so
       # a failure is republished as one. Newlines become ~ to keep it to a single line.
