@@ -361,6 +361,10 @@ async function resize(scale: PetScaleName): Promise<void> {
   petWindow?.webContents.send('pet:settings', next);
 }
 async function contextMenu(): Promise<void> {
+  // A native menu takes the mouse, button release included. A drag still in progress when
+  // one opens would never be told it had ended, and the pet would follow the cursor from
+  // then on - so whatever opened this menu, any drag stops here.
+  await endDrag();
   const currentSettings = await store.read();
   const states = (['IDLE', 'WORKING', 'THINKING', 'CELEBRATING', 'SLEEPING', 'FOCUS'] as PetState[]).map((stateValue) => ({
     label: stateValue[0] + stateValue.slice(1).toLowerCase(),

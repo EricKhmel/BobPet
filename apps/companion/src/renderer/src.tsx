@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { PetState, StoredSettings } from '@bob-pet/shared';
-import { PET_GRID_ROWS, PET_HEADROOM_ROWS, PET_SCALES, STILL_RUNNING_MS, defaultSettings, dropDuration, dropIn, formatElapsed, petHeightFor } from '@bob-pet/shared';
+import { PET_GRID_ROWS, PET_HEADROOM_ROWS, PET_SCALES, STILL_RUNNING_MS, defaultSettings, dropDuration, dropIn, formatElapsed, isPrimaryPress, petHeightFor } from '@bob-pet/shared';
 import './style.css';
+
+/** Control+click means "open the menu" only on a Mac, so the press rule needs to know. */
+const IS_MAC = navigator.userAgent.includes('Macintosh');
 
 type Pixel = [number, number, number, number, string];
 const fill = (x: number, y: number, w: number, h: number, color: string): Pixel => [x, y, w, h, color];
@@ -592,6 +595,8 @@ function App(): React.JSX.Element {
   // The last line stays mounted while it fades out, so it leaves rather than vanishes.
   const [shownBubble, setShownBubble] = useState<{ text: string; since?: number } | null>(null);
   const [petBox, setPetBox] = useState({ left: 0, size: 64 });
+  // Whether the press now held is one the click surface accepted as a click or a drag.
+  const pressing = useRef(false);
 
   useEffect(() => {
     if (bubble) {
@@ -688,12 +693,18 @@ function App(): React.JSX.Element {
           className="click-target"
           aria-label="Focus IBM Bob"
           onPointerDown={(event) => {
-            if (event.button !== 0) return;
+            // Control+click on a Mac asks for the menu, and must not also begin a drag.
+            if (!isPrimaryPress(event, IS_MAC)) return;
+            pressing.current = true;
             event.currentTarget.setPointerCapture(event.pointerId);
             void window.bobPet.dragStart();
           }}
           onPointerUp={(event) => {
-            if (event.button !== 0) return;
+            // Only a press this surface accepted is resolved here. Otherwise the release
+            // of a Control+click would count as a click and bring Bob forward behind the
+            // menu that press was asking for.
+            if (event.button !== 0 || !pressing.current) return;
+            pressing.current = false;
             const target = event.currentTarget;
             if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
             void window.bobPet.dragEnd().then((dragged) => {
@@ -701,6 +712,7 @@ function App(): React.JSX.Element {
             });
           }}
           onPointerCancel={() => {
+            pressing.current = false;
             void window.bobPet.dragEnd();
           }}
           onClick={(event) => {

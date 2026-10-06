@@ -114,6 +114,18 @@ export function dragOutcome(
 }
 
 /**
+ * Whether a press on the pet begins a click or a drag, rather than asking for its menu.
+ *
+ * Control+click is how a Mac without a secondary button asks for a context menu, but it
+ * arrives as the primary button with the control key held, not as the secondary button.
+ * Treating it as an ordinary press starts a drag, and the native menu that opens next takes
+ * the release with it - so nothing ever ends that drag, and the pet follows the cursor
+ * around until it is clicked again. Elsewhere Control+click is just a click.
+ */
+export const isPrimaryPress = (press: { button: number; ctrlKey: boolean }, mac: boolean): boolean =>
+  press.button === 0 && !(mac && press.ctrlKey);
+
+/**
  * Maps one IBM Bob hook payload to a pet state.
  *
  * Bob's documented hook events are SessionStart, UserPromptSubmit, PreToolUse,

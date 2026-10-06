@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.1 — 2026-10-06
+
+### Fixed
+
+- **A Control+click on a Mac no longer leaves the pet stuck to the cursor.** Control+click
+  is how a Mac without a secondary button asks for a menu, but it arrives as an ordinary
+  press with the control key held, so the pet began a drag as well as opening its menu. The
+  menu then took the button release with it, nothing ended the drag, and the pet followed
+  the cursor until it was clicked again. That press now only opens the menu, and opening the
+  menu ends any drag in progress however it was opened. A two-finger tap was never affected,
+  and nothing changes on Windows.
+
 ## 0.2.0 — 2026-09-29
 
 ### Added

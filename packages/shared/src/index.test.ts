@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PET_STATES, PET_SCALES, PET_OPACITIES, clampPosition, migrateSettings, parseMessage, defaultSettings, dragOutcome, stateForHook, describeHook, dropDuration, dropIn, petDataDir, startTally, countStep, wrapUp, formatElapsed } from './index.js';
+import { PET_STATES, PET_SCALES, PET_OPACITIES, clampPosition, migrateSettings, parseMessage, defaultSettings, dragOutcome, isPrimaryPress, stateForHook, describeHook, dropDuration, dropIn, petDataDir, startTally, countStep, wrapUp, formatElapsed } from './index.js';
 
 test('protocol validation: accepts exact protocol messages and valid states', () => {
   for (const state of PET_STATES) {
@@ -78,6 +78,21 @@ test('clampPosition: clamps coordinates to valid visible work areas', () => {
   assert.deepEqual(clampPosition({ x: -100, y: -50 }, displays, 64), { x: 0, y: 0 });
   // Inside bounds
   assert.deepEqual(clampPosition({ x: 500, y: 500 }, displays, 64), { x: 500, y: 500 });
+});
+
+test('isPrimaryPress: a Control+click on a Mac asks for the menu and never begins a drag', () => {
+  // The case that stuck the pet to the cursor: the primary button, with control held.
+  assert.equal(isPrimaryPress({ button: 0, ctrlKey: true }, true), false);
+  // An ordinary press is still a click or a drag, on every platform.
+  assert.equal(isPrimaryPress({ button: 0, ctrlKey: false }, true), true);
+  assert.equal(isPrimaryPress({ button: 0, ctrlKey: false }, false), true);
+  // Control+click means nothing special off the Mac, so it stays an ordinary press there.
+  assert.equal(isPrimaryPress({ button: 0, ctrlKey: true }, false), true);
+  // The secondary and middle buttons never begin one anywhere.
+  for (const mac of [true, false]) {
+    assert.equal(isPrimaryPress({ button: 2, ctrlKey: false }, mac), false);
+    assert.equal(isPrimaryPress({ button: 1, ctrlKey: false }, mac), false);
+  }
 });
 
 test('dragOutcome: a press only becomes a drag past the threshold, and stays one', () => {
